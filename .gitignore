@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Virtual environments (uv creates .venv)
+.venv/
+venv/
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Model weights, caches and large data
+models/
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.ckpt
+.cache/
+hf_cache/
+data/raw/
+
+# Local results and databases
+*.sqlite
+*.sqlite3
+*.db
+runs/
+outputs/
+
+# Course reference images (ByteByteGo material, keep local only)
+docs/reference-images/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
