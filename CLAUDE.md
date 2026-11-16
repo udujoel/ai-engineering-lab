@@ -11,8 +11,9 @@ Current focus: `01-llm-playground/`.
 This is a learning project. Understanding matters more than speed.
 
 - Explain the concept briefly before writing code for a step.
-- The author writes the core logic: decoding and sampling, chunking and retrieval, the agent loop and orchestration. For these, provide signatures, tests and hints, then review. Write full code only when asked.
-- Setup, UI wiring, config, plotting and test scaffolding can be written directly.
+- The author is not a programmer but learns hands on. For each step, give the commands for the author to run in their own terminal, explain what each command does and what output to expect, then check the results together. Do not run the learning steps silently on the author's behalf.
+- Claude writes code files when a step needs them, explains each piece (what it does, why this way, one rejected alternative, how it connects), and the author runs them.
+- Core logic gets the most explanation: decoding and sampling, chunking and retrieval, the agent loop and orchestration. Ask the author to predict or interpret results, and to make the judgement calls.
 - One build step at a time. When a step is done, tick it in the project README and suggest a commit message.
 - No frameworks such as LangChain or LlamaIndex unless asked.
 - Back trade offs with a small experiment or measurement.

@@ -6,6 +6,19 @@ See what happens between a prompt and a reply. Inspect tokenization, step throug
 
 Ollama, Hugging Face transformers (Qwen2.5 0.5B), tiktoken, Streamlit, SQLite.
 
+## Setup
+
+Needs uv and Ollama (`brew install uv ollama`). From this folder:
+
+```bash
+uv sync                                  # create .venv with Python 3.12 and all libraries
+uv run python scripts/smoke_test.py      # load Qwen2.5 0.5B on mps, print top 5 next tokens
+uv run pytest -m "not slow"              # fast tests; drop the -m flag to include model tests
+ollama serve                             # start the Ollama server when a step needs it
+```
+
+See [PLAN.md](PLAN.md) for how each step is built.
+
 ## Build steps
 
 - [ ] 1. Run three or four local models from different families through Ollama.
