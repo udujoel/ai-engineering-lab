@@ -163,6 +163,14 @@ The trade off showed up in the log too: `forcing full prompt re-processing due t
 
 **Other notes**
 - Warm load is 1 to 2 ms against 2.4 to 3.5 s cold, more than 1,000 times faster.
-- Decode matches Part B within 2% for Qwen3, Gemma and deepseek. Llama dropped from 72.9 to 66.3 tok/s (9%). Cause unknown; rerun Llama alone to check.
+- Decode matches Part B within 2% for Qwen3, Gemma and deepseek. Llama dropped from 72.9 to 66.3 tok/s (9%), so I reran Llama alone (`uv run python scripts/bench_ollama.py llama3.2:3b`):
+
+| Llama run | Cold load | Warm load | Prefill | Decode |
+|---|---|---|---|---|
+| Part B (`ollama run`) | 2.84 s | | | 72.9 tok/s |
+| Full benchmark | 2.85 s | 1 ms | 751 tok/s | 66.3 tok/s |
+| Rerun alone | 2.39 s | 7 ms | 758 tok/s | 71.1 tok/s |
+
+  Back within 2.5% of Part B, so the 66.3 was a slow session, not a property of the model. Prefill barely moved (1%), decode moved 7%. Decode depends on memory bandwidth, which other apps compete for on a Mac under memory pressure. Lesson: a median of 3 runs smooths noise inside one session, not between sessions. Differences under about 10% between two sessions are not a finding.
 - Units: my script reports GiB (1,024^3 bytes), `ollama ps` reports GB (1,000^3). Llama's 5.6 GiB is the same as the 6.0 GB `ollama ps` showed in Part B.
 - Same caveat for "cold": the model files were probably still in the macOS file cache. A load right after a reboot would be slower.

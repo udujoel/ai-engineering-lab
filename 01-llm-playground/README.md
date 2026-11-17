@@ -49,6 +49,8 @@ From `uv run python scripts/bench_ollama.py`: prefill on about 1,430 tokens, dec
 | gemma3:4b | 2.47 s | 1 ms | 637 tok/s | 53.9 tok/s | 2.8 GiB |
 | deepseek-r1:7b | 3.51 s | 1 ms | 343 tok/s | 33.4 tok/s | 5.7 GiB |
 
+A rerun of Llama alone gave 71.1 tok/s decode, so expect up to about 7% noise between sessions.
+
 - Decode speed follows model size: every token reads all the weights, and all four move 130 to 160 GB/s of the chip's 200 GB/s.
 - Prefill is only 10 to 12 times faster than decode on this GPU, because prefill is limited by arithmetic, not memory.
 - Most memory is KV cache, not weights. Gemma's sliding window attention cuts its cache to a fifth of Qwen3's.
