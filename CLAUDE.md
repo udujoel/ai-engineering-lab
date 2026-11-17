@@ -15,6 +15,7 @@ This is a learning project. Understanding matters more than speed.
 - Claude writes code files when a step needs them, explains each piece (what it does, why this way, one rejected alternative, how it connects), and the author runs them.
 - Core logic gets the most explanation: decoding and sampling, chunking and retrieval, the agent loop and orchestration. Ask the author to predict or interpret results, and to make the judgement calls.
 - One build step at a time. When a step is done, tick it in the project README and suggest a commit message.
+- Log every part's numbers, observations, the author's predictions and decisions in the project's `LAB_NOTES.md` as results come in. The author writes blog posts from it.
 - No frameworks such as LangChain or LlamaIndex unless asked.
 - Back trade offs with a small experiment or measurement.
 

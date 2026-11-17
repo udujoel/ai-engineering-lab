@@ -27,7 +27,7 @@ By the end you should be able to explain, using your own UI and eval data, what 
 
 | Family | Example tag | What it teaches |
 |---|---|---|
-| Qwen | `qwen3:4b` | Strong small model with a thinking toggle |
+| Qwen | `qwen3:4b` | Qwen3 4B Thinking 2507: always reasons, `--think=false` does not stop it. Kept on purpose to show the cost of reasoning. |
 | Gemma | `gemma3:4b` or the smallest `gemma4` | Very large vocabulary (about 256k), so it spends fewer tokens on non English text |
 | Llama | `llama3.2:3b` | Meta baseline with a 128k vocabulary |
 | Reasoning | `deepseek-r1:7b` | Thinking tokens and what they cost in latency |
