@@ -16,6 +16,7 @@ This is a learning project. Understanding matters more than speed.
 - Core logic gets the most explanation: decoding and sampling, chunking and retrieval, the agent loop and orchestration. Ask the author to predict or interpret results, and to make the judgement calls.
 - One build step at a time. When a step is done, tick it in the project README and suggest a commit message.
 - Log every part's numbers, observations, the author's predictions and decisions in the project's `LAB_NOTES.md` as results come in. The author writes blog posts from it.
+- Log every mistake, slip, forgotten item or self correction by Claude in `docs/mistakes-log.md` as soon as it is noticed, whoever caught it. Each entry covers context, what happened, why it was a mistake, implications, how it was caught, recovery and the lesson.
 - No frameworks such as LangChain or LlamaIndex unless asked.
 - Back trade offs with a small experiment or measurement.
 

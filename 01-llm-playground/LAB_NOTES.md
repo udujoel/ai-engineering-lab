@@ -91,7 +91,7 @@ KV cache = 2 (keys and values) x layers x KV heads x 128 x 2 bytes x 32,768 posi
 **Finding 6: same question, four different meanings of "token".** Llama and Gemma explained crypto tokens, Qwen3 compiler tokens, and DeepSeek operating system tokens (inventing a "printer token" along the way). None explained LLM tokens. My reading: the prompt gave no context, so each model went with the meaning most common in its training data. The LLM sense of the word is recent and rare in that data.
 
 **Other notes**
-- The same 9 word question became 13 to 35 prompt tokens. Each model wraps it in its own hidden chat template; Llama's adds a system header with a knowledge cutoff date.
+- The same 8 word question became 13 to 35 prompt tokens. Each model wraps it in its own hidden chat template; Llama's adds a system header with a knowledge cutoff date.
 - Prompt eval rates from short prompts are noise (55 to 512 tok/s for similar prompts). Prefill needs a long prompt to measure.
 - Each model ships its own default sampling settings (seen in the log): deepseek temperature 0.8, top_k 40; qwen3 temperature 0.6, top_k 20, top_p 0.95.
 
@@ -174,3 +174,85 @@ The trade off showed up in the log too: `forcing full prompt re-processing due t
   Back within 2.5% of Part B, so the 66.3 was a slow session, not a property of the model. Prefill barely moved (1%), decode moved 7%. Decode depends on memory bandwidth, which other apps compete for on a Mac under memory pressure. Lesson: a median of 3 runs smooths noise inside one session, not between sessions. Differences under about 10% between two sessions are not a finding.
 - Units: my script reports GiB (1,024^3 bytes), `ollama ps` reports GB (1,000^3). Llama's 5.6 GiB is the same as the 6.0 GB `ollama ps` showed in Part B.
 - Same caveat for "cold": the model files were probably still in the macOS file cache. A load right after a reboot would be slower.
+
+---
+
+## Step 2: tokenizer explorer (2026-11-18)
+
+### Part A: six tokenizers, one sentence
+
+`scripts/tokenize_text.py` shows how each tokenizer splits a text into pieces and IDs. Qwen2.5 is the Step 0 model's tokenizer. The other five are new: GPT-2, SmolLM2 and Phi-4 mini from Hugging Face (tokenizer files only, a few MB each), and OpenAI's GPT-4 (`cl100k_base`) and GPT-4o (`o200k_base`) through tiktoken. Tests first: `uv run pytest tests/test_tokenizers.py` gave 7 passed.
+
+My predictions before running:
+1. "A token is a piece of text that a model works with. It converts this to a number before using it." Qwen would make the 8 word sentence 8 tokens.
+2. `1234567` would likely stay as one token, and the six tokenizers might not all do the same.
+
+Results for "Explain what a token is in two sentences." (41 characters, 8 words). `·` is a space:
+
+| Tokenizer | Vocabulary | Tokens | How "Explain" splits |
+|---|---|---|---|
+| gpt2 | 50,257 | 10 | `Expl` `ain` |
+| qwen2.5 | 151,665 | 10 | `Ex` `plain` |
+| smollm2 | 49,152 | 9 | `Explain` |
+| phi-4-mini | 200,029 | 9 | `Explain` |
+| gpt-4 | 100,277 | 10 | `Ex` `plain` |
+| gpt-4o | 200,019 | 9 | `Explain` |
+
+The rest is the same for all six: `·what | ·a | ·token | ·is | ·in | ·two | ·sentences | .`
+
+**Prediction 1 was close: 9 to 10 tokens, not 8.** The full stop is a token of its own, and "Explain" splits in two for half the tokenizers. Common English words are one token each in every vocabulary.
+
+**The space belongs to the next word.** Every word after the first is stored as `·what`, `·token`: a space plus the word. So "token" at the start of a sentence and " token" in the middle are different tokens with different IDs (the same thing as `' Paris'` in Step 0).
+
+**Phi-4 mini and GPT-4o produced identical IDs** (`[176289, 1412, 261, ...]`). Microsoft built Phi-4 mini on OpenAI's o200k vocabulary. The 10 extra entries (200,029 vs 200,019) are presumably Phi's own special tokens.
+
+**Qwen2.5 and GPT-4 split the sentence the same way, and many IDs match exactly** (` a` 264, ` is` 374, ` in` 304, `.` 13). Qwen's vocabulary looks like it was built on top of GPT-4's cl100k. Not yet confirmed from a source.
+
+**A bigger vocabulary did not mean fewer tokens here.** SmolLM2 (49k) used 9, the same as the 200k vocabularies. For plain English all of them are near one token per word. Where they should differ is other languages, code and numbers (Part B).
+
+**Back to Step 1:** the bare sentence is 9 to 10 tokens, but Ollama counted 13 to 35. The difference is each model's hidden chat template. Llama's 35 means about 25 tokens of wrapping (its system header with a knowledge cutoff date). Part B will measure this per model.
+
+#### Numbers and emoji
+
+`uv run python scripts/tokenize_text.py "The price is 1234567 dollars 🙂"` (30 characters, 6 words):
+
+| Tokenizer | Tokens | How `1234567` splits | Rule |
+|---|---|---|---|
+| gpt2 | 8 | `·123` `45` `67` | No rule: whatever chunks happened to be common in its training text, space included |
+| qwen2.5 | 13 | `1` `2` `3` `4` `5` `6` `7` | One token per digit |
+| smollm2 | 13 | `1` `2` `3` `4` `5` `6` `7` | One token per digit |
+| phi-4-mini | 9 | `123` `456` `7` | Groups of up to 3 digits, counted from the left |
+| gpt-4 | 9 | `123` `456` `7` | Groups of up to 3 digits, counted from the left |
+| gpt-4o | 9 | `123` `456` `7` | Groups of up to 3 digits, counted from the left |
+
+**Prediction 2 was half right.** The number did not stay one token in any tokenizer, but the tokenizers did not all agree: there are three different strategies. "GPT-4, GPT-4o and Phi did the same on the number."
+
+- The digit-by-digit tokenizers spend 7 tokens on the number. Price or context cost aside, that is the most expensive.
+- In five of the six, the space before the number is a token of its own (`·`). Only GPT-2 glues it to the digits (`·123`).
+- The emoji was not split: ` 🙂` is one token in all six, so no `▯` appeared. Common emoji have their own token.
+
+**Which split makes arithmetic easiest?** My first guess: "gpt2 might make arithmetic easier but not sure on this one".
+
+#### Testing the arithmetic question
+
+My predictions before running:
+1. Will GPT-2 split different 7 digit numbers the same way? "I'd lean towards no for gpt2. Don't think it'll be consistent."
+2. For which strategy is the last token always just the units digit? "the gpt-4x and phi"
+
+`uv run python scripts/tokenize_text.py "1234567 2345678 1000000 9876543 👍🏽"`:
+
+| Tokenizer | 1234567 | 2345678 | 1000000 | 9876543 | Total tokens |
+|---|---|---|---|---|---|
+| gpt2 | `123` `45` `67` | `·23` `45` `678` | `·100` `0000` | `·9` `87` `65` `43` | 17 |
+| qwen2.5, smollm2 | 7 single digits | 7 single digits | 7 single digits | 7 single digits | 34, 37 |
+| phi-4-mini, gpt-4, gpt-4o | `123` `456` `7` | `234` `567` `8` | `100` `000` `0` | `987` `654` `3` | 18, 20, 18 |
+
+**Prediction 1 was right.** GPT-2 split four 7 digit numbers four different ways (3-2-2, 2-2-3, 3-4, 1-2-2-2). Worse, the same token means different things: `45` is the thousands and hundreds digits in 1234567, but the ten thousands and thousands digits in 2345678. To add two numbers the model must line up place values, and GPT-2's tokens hide them.
+
+**Prediction 2 was right for these numbers, but only by coincidence.** A 7 digit number groups as 3 + 3 + 1, so the last group happens to be the units digit alone. A 6 digit number like 123456 groups as `123` `456`, and the units digit is buried in a 3 digit token. Left grouping has a second problem: `123` means millions in 1234567 but thousands in 123456, so the model has to know the length of the number to read any group. Only one token per digit (Qwen2.5, SmolLM2) always keeps the units digit on its own.
+
+The trade off is cost: one token per digit spent 28 tokens on 28 digits, against 15 for 3 digit groups.
+
+**The emoji did split.** 👍🏽 is two characters (thumbs up plus a skin tone modifier), 8 bytes in all, and took 3 to 6 tokens with the space: 3 for Qwen2.5, Phi-4 mini and GPT-4o, 5 for GPT-2 and GPT-4, 6 for SmolLM2. Emoji with modifiers are expensive.
+
+**Bug found in my explorer:** Phi-4 mini and GPT-4o gave identical IDs for the emoji but displayed the pieces differently. Fixed, see mistake 11 in `docs/mistakes-log.md`. The counts and IDs above were correct; only the placement of `▯` differed.
