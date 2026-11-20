@@ -165,6 +165,8 @@ Entries 1 to 9 were reconstructed on 2026-11-18 from the session transcripts. Th
   - `device.py` documents that `PLAYGROUND_DEVICE` can be set in `.env`, but nothing on the smoke test's path loaded `.env`.
   - `bench_ollama.py` and `unload()` compared model names exactly. Ollama lists `llama3.2` as `llama3.2:latest`, so an untagged name would crash the benchmark at the end, and `unload()` could return before the model was gone.
   - The tiktoken adapter in `tokenizers.py` crashed on empty text instead of returning zero tokens.
+  - `HF_TOKEN` in `.env` was never loaded for the tokenizers either.
+  - `bench_ollama.py` paired the median decode rate with the minimum token count. Every run hit the full 200 tokens, so the recorded table is right, but a run that stopped early would have been misreported.
 - **Why it was a mistake:** each one is a promise in a docstring or an obvious input that was never tested.
 - **Implications:** none of the recorded results: Du always passed full tags, never used the `.env` device setting, and never tokenized empty text. The empty text bug would have crashed the Streamlit page in Part C, which starts with an empty box.
 - **How it was caught:** by Devin and CodeRabbit on PR #1, 2026-11-20.
@@ -177,6 +179,7 @@ Entries 1 to 9 were reconstructed on 2026-11-18 from the session transcripts. Th
 - **What happened:** the README said "Most memory is KV cache, not weights", and LAB_NOTES said "The template cost is fixed per model".
 - **Why it was a mistake:** the KV cache is larger than the weights only for Llama and Qwen3. DeepSeek (1.75 GiB cache, 4.7 GB model) and Gemma (0.8 GiB cache) are the other way round. And Gemma's template cost varied (9, 8, 9), on only three texts.
 - **Implications:** a blog post written from the notes would have carried the overstatement.
-- **How it was caught:** by CodeRabbit on PR #1, 2026-11-20.
-- **Recovery:** both statements now say what the data supports: the cache can outweigh the weights at a 32k context, and the template cost looks fixed for these three texts.
+- **Also:** cubic found four smaller imprecisions in LAB_NOTES: "outputs a probability" (the model outputs logits; softmax makes them probabilities), 151,936 called tokens (they are vocabulary slots, 151,665 used by the tokenizer), a time-to-answer formula without prefill, and a KV cache formula with a fixed head dimension of 128 (Gemma's is 256).
+- **How it was caught:** by CodeRabbit and cubic on PR #1, 2026-11-20.
+- **Recovery:** all of these are reworded, and both statements now say what the data supports: the cache can outweigh the weights at a 32k context, and the template cost looks fixed for these three texts.
 - **Lesson:** a finding is only as general as the models and texts behind it. Say which ones.

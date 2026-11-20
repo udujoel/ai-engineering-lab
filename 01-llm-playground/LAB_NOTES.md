@@ -30,7 +30,7 @@ Top 5 guesses for the next token:
 | `:\n` | 5.1% |
 
 **Observations**
-- A model never outputs a word. It outputs a probability for every one of 151,936 tokens, and something else picks one.
+- A model never outputs a word. It outputs a score (a logit) for each of its 151,936 vocabulary slots, softmax turns the scores into probabilities, and something else picks one. (The tokenizer uses 151,665 of those slots; the rest are padding that never wins.)
 - Paris wins with only 31.6%. Most of the rest is fill in the blank underscores: a base model has read a lot of quizzes and worksheets, so "The capital of France is ____" is a very common pattern in its training text.
 - Words start with a space inside the token (`' Paris'`), so " Paris" and "Paris" are different tokens.
 
@@ -72,7 +72,7 @@ Prompt: "Explain what a token is in two sentences." Run with `ollama run <model>
 
 All four land at 65 to 80% of the chip's 200 GB/s. Gemma downloads at 3.4 GB but decodes like a 2.5 GB model, because the vision part is not touched when writing text.
 
-**Finding 2: thinking tokens decide the total time.** Qwen3 and Gemma decode at the same speed, but Qwen3 wrote 1,145 tokens against Gemma's 56 and took 7 times as long. Deepseek is slower per token but wrote half as many tokens as Qwen3, so it finished first of the two. Time to answer = load + reply tokens / decode speed.
+**Finding 2: thinking tokens decide the total time.** Qwen3 and Gemma decode at the same speed, but Qwen3 wrote 1,145 tokens against Gemma's 56 and took 7 times as long. Deepseek is slower per token but wrote half as many tokens as Qwen3, so it finished first of the two. Time to answer = load + prompt tokens / prefill speed + reply tokens / decode speed. With prompts this short, the reply term dominates.
 
 **Finding 3: `--think=false` did not stop Qwen3 from thinking.** The server log names the model "Qwen3 4B Thinking 2507", a model trained to always reason. Ollama switched thinking off in the template, the model reasoned anyway, and the reasoning leaked into the visible answer (a lone `</think>` near the end). It saved only 217 tokens. A flag can ask for a behaviour; the weights decide.
 
@@ -84,7 +84,7 @@ All four land at 65 to 80% of the chip's 200 GB/s. Gemma downloads at 3.4 GB but
 | qwen3:4b | 2.5 GB | 4.5 GiB | about 7.0 GB |
 | deepseek-r1:7b | 4.7 GB | 1.75 GiB | 6.0 GB |
 
-KV cache = 2 (keys and values) x layers x KV heads x 128 x 2 bytes x 32,768 positions. Qwen3 has 36 layers x 8 KV heads, deepseek 28 x 4, so the smaller model carries 2.6 times the cache.
+KV cache = 2 (keys and values) x layers x KV heads x head dimension x 2 bytes x 32,768 positions. The head dimension is 128 for Llama, Qwen3 and DeepSeek, and 256 for Gemma. Qwen3 has 36 layers x 8 KV heads, deepseek 28 x 4, so the smaller model carries 2.6 times the cache.
 
 **Finding 5: only one model fits at a time on this Mac right now.** After all four runs, `ollama ps` listed only deepseek. The server log said: `model predicted to exceed available memory, evicting ... system_free="4.4 GiB"`. The limit was free system RAM, not the GPU budget, because the Mac shares one pool of memory between apps and GPU.
 

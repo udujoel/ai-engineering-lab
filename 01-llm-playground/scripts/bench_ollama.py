@@ -82,7 +82,7 @@ def bench(client: Client, model: str) -> Result:
         warm_load_s=warm.load_s,
         prefill_tokens=prefill[0].prompt_tokens,
         prefill_tps=statistics.median(t.prefill_tps for t in prefill),
-        decode_tokens=min(t.output_tokens for t in decode),
+        decode_tokens=int(statistics.median(t.output_tokens for t in decode)),  # can stop early on EOS
         decode_tps=statistics.median(t.decode_tps for t in decode),
         memory_gib=(loaded.size or 0) / 2**30,
         context=loaded.context_length or 0,
