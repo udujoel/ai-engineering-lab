@@ -6,6 +6,7 @@ comparison (step 5) all measure speed the same way.
 """
 
 import os
+import time
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
@@ -13,12 +14,28 @@ from ollama import Client, GenerateResponse
 
 NS_PER_SECOND = 1_000_000_000
 DEFAULT_HOST = "http://localhost:11434"
+# The four models from step 1, one per family.
+STEP1_MODELS = ["llama3.2:3b", "qwen3:4b", "gemma3:4b", "deepseek-r1:7b"]
 
 
 def get_client() -> Client:
     """A client for the server in OLLAMA_HOST (read from .env), or the default local one."""
     load_dotenv()
     return Client(host=os.getenv("OLLAMA_HOST") or DEFAULT_HOST)
+
+
+def unload(client: Client, model: str, timeout_s: float = 15.0) -> None:
+    """Ask Ollama to drop the model from memory, then wait until `ollama ps` agrees.
+
+    Unloading also empties the prompt cache, so the next request is measured from scratch.
+    """
+    client.generate(model=model, keep_alive=0)  # empty prompt + keep_alive 0 = unload
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if all(m.model != model for m in client.ps().models):
+            return
+        time.sleep(0.2)
+    raise RuntimeError(f"{model} was still loaded after {timeout_s:.0f}s")
 
 
 def tokens_per_second(count: int, duration_ns: int) -> float:

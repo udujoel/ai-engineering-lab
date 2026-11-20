@@ -206,7 +206,7 @@ The rest is the same for all six: `·what | ·a | ·token | ·is | ·in | ·two 
 
 **Phi-4 mini and GPT-4o produced identical IDs** (`[176289, 1412, 261, ...]`). Microsoft built Phi-4 mini on OpenAI's o200k vocabulary. The 10 extra entries (200,029 vs 200,019) are presumably Phi's own special tokens.
 
-**Qwen2.5 and GPT-4 split the sentence the same way, and many IDs match exactly** (` a` 264, ` is` 374, ` in` 304, `.` 13). Qwen's vocabulary looks like it was built on top of GPT-4's cl100k. Not yet confirmed from a source.
+**Qwen2.5 and GPT-4 split the sentence the same way, and many IDs match exactly** (` a` 264, ` is` 374, ` in` 304, `.` 13). Qwen's vocabulary looks like it was built on top of GPT-4's cl100k. Confirmed on 2026-11-19: the Qwen technical report (arXiv 2309.16609) says they used tiktoken, took cl100k_base as the starting point, added common Chinese characters and words and words from other languages, and split numbers into single digits, ending near 152k.
 
 **A bigger vocabulary did not mean fewer tokens here.** SmolLM2 (49k) used 9, the same as the 200k vocabularies. For plain English all of them are near one token per word. Where they should differ is other languages, code and numbers (Part B).
 
@@ -253,6 +253,78 @@ My predictions before running:
 
 The trade off is cost: one token per digit spent 28 tokens on 28 digits, against 15 for 3 digit groups.
 
+**My conclusion:** "digit per digit, worth the extra tokens for maths". This changed my first guess (GPT-2) once I saw it was inconsistent. Fewer tokens is not the same as more useful tokens.
+
 **The emoji did split.** 👍🏽 is two characters (thumbs up plus a skin tone modifier), 8 bytes in all, and took 3 to 6 tokens with the space: 3 for Qwen2.5, Phi-4 mini and GPT-4o, 5 for GPT-2 and GPT-4, 6 for SmolLM2. Emoji with modifiers are expensive.
 
 **Bug found in my explorer:** Phi-4 mini and GPT-4o gave identical IDs for the emoji but displayed the pieces differently. Fixed, see mistake 11 in `docs/mistakes-log.md`. The counts and IDs above were correct; only the placement of `▯` differed.
+
+### Part B: what Ollama counts for the same text
+
+`scripts/ollama_token_counts.py` asks each of the four Ollama models for a 1 token reply, twice per text: once with the text only (`raw=True`, no chat template) and once wrapped in the chat template, as `ollama run` sends it. It reads `prompt_eval_count` both times. The model is reloaded before every request, so the prompt cache (Step 1 Part C) can't hide any tokens. Three texts: the Step 1 sentence, the four numbers from Part A and a Portuguese sentence.
+
+My predictions before running:
+1. Which Part A tokenizer will each model match? "qwen3" (read as: qwen3 matches Qwen2.5; no guess for deepseek-r1 or llama3.2).
+2. Will a matching model's count be equal, or off? "off by a token or two".
+
+Results (`uv run python scripts/ollama_token_counts.py`, run twice, identical both times, no reload warnings). Text only counts, with the closest Part A tokenizer:
+
+| Model | Sentence | Numbers | Portuguese | Closest Part A tokenizer | Difference |
+|---|---|---|---|---|---|
+| qwen3:4b | 10 | 31 | 14 | qwen2.5 (10, 31, 14) | 0 on all three |
+| deepseek-r1:7b | 11 | 32 | 15 | qwen2.5 (10, 31, 14) | +1 on all three |
+| llama3.2:3b | 11 | 16 | 15 | gpt-4 (10, 15, 14) | +1 on all three |
+| gemma3:4b | 10 | 33 | 13 | none | no constant offset |
+
+What the chat template adds, per model:
+
+| Model | Sentence | Numbers | Portuguese |
+|---|---|---|---|
+| llama3.2:3b | 24 | 24 | 24 |
+| qwen3:4b | 10 | 10 | 10 |
+| gemma3:4b | 9 | 8 | 9 |
+| deepseek-r1:7b | 2 | 2 | 2 |
+
+**The measurement checks out.** The sentence's "with chat template" counts (35, 20, 19, 13) are exactly Step 1's numbers.
+
+**Prediction 1 was right: qwen3 matches Qwen2.5 exactly**, on an English sentence, digit by digit numbers and Portuguese. Three different kinds of text agreeing exactly is strong evidence of the same vocabulary. It is counts, not IDs, so not a proof.
+
+**Prediction 2 was half right.** Qwen3 was not off at all. DeepSeek and Llama were off, but always by exactly 1, whatever the text. A difference that never changes with the text is not part of the text: it is something added in front of every input.
+
+**Gemma matches none of the six**, as expected: its vocabulary is one we haven't loaded. It also splits numbers digit by digit (33 tokens for 28 digits).
+
+**The template cost is fixed per model.** Llama wraps every prompt in 24 extra tokens, DeepSeek in 2. For a short question Llama's wrapping is more than twice the question itself. Gemma's 9, 8, 9 is the only one that varies with the text; reason not known yet.
+
+My interpretation:
+1. Llama = GPT-4 + 1: "suggests it comes from the same GPT-4's with an extra token always added". The extra token is a start of text marker the runtime puts in front of every input; DeepSeek adds one too, Qwen3 doesn't. Llama's vocabulary is larger than GPT-4's: `ollama show llama3.2:3b --verbose` gives `llama.vocab_size 128256`, against GPT-4's 100,277. So it looks like GPT-4's plus about 28k extra entries. Yet on this Portuguese sentence the extras saved nothing: 14 + 1, the same as GPT-4.
+2. Portuguese: "GPT4o and Phi-4 mini that use 12 tokens should be cheaper for Portuguese because of the smaller token usage". That says which is cheaper; why they need fewer tokens is the next check (how each tokenizer splits the Portuguese words).
+
+#### Why some tokenizers are cheaper for Portuguese
+
+My prediction before running: "gpt-4o and phi keep enquanto whole, gpt2 chops it". No guess for `sofá`.
+(The command had already run in the terminal when I wrote this.)
+
+`uv run python scripts/tokenize_text.py "O gato dorme no sofá enquanto chove lá fora."`:
+
+| Tokenizer | Tokens | `·gato` | `·sofá` | `·enquanto` | `·lá` |
+|---|---|---|---|---|---|
+| gpt2 | 18 | `·g` `ato` | `·so` `f` `á` | `·enqu` `anto` | `·l` `á` |
+| smollm2 | 19 | `·g` `ato` | `·so` `f` `á` | `·en` `quant` `o` | `·l` `á` |
+| qwen2.5, gpt-4 | 14 | `·g` `ato` | `·sof` `á` | whole | whole |
+| phi-4-mini, gpt-4o | 12 | whole | whole | whole | whole |
+
+`·dorm` `e` and `·ch` `ove` split the same way in all six.
+
+**Prediction partly right.** GPT-4o and Phi-4 mini keep `enquanto` whole and GPT-2 chops it, as predicted. But Qwen2.5 and GPT-4 keep it whole too. The difference between 12 and 14 tokens is `gato` and `sofá`: only the 200k vocabularies have them as whole words.
+
+**Two ways a tokenizer wastes tokens on Portuguese:**
+- **Words become English-looking fragments.** GPT-2 and SmolLM2 cut `enquanto` into `enqu` `anto` or `en` `quant` `o`: pieces that are common in English text.
+- **Accented letters break words.** In GPT-2 and SmolLM2, `á` is a token of its own, so `sofá` costs 3 tokens and `lá` 2. Qwen2.5 and GPT-4 keep `lá` whole but still split `sof` `á`.
+
+**Why:** a vocabulary is learned from its training text. A word gets its own token only if it was common enough there. The small English focused vocabularies (GPT-2 50k, SmolLM2 49k) learned English fragments and left Portuguese in pieces. The 200k vocabularies had room, and apparently enough Portuguese in their training text, for whole words like `gato` and `sofá`. Llama's 28k extra entries evidently didn't include them: it matched GPT-4 + 1.
+
+First answer to the "done when" question: GPT-4o and Phi-4 mini are cheapest for Portuguese here, because their larger, more multilingual vocabulary holds whole Portuguese words, including accented ones. This is one 9 word sentence; the test set and chart (next) will check it on a full paragraph.
+
+Rerun after the prediction: same output.
+
+**Qwen2.5 and GPT-4 split the Portuguese the same way, but most IDs differ** (`·no` 902 vs 912, `·ch` 521 vs 523, `ato` 4330 vs 4428). Only the shortest pieces match. The Qwen report explains the shared splits: it started from GPT-4's cl100k vocabulary. Why the IDs shifted is a guess: Qwen splits numbers into single digits, so it would have removed cl100k's multi digit tokens (`00`, `201` and so on), moving every later ID down. Qwen's IDs here are all a little lower, which fits. Not checked.

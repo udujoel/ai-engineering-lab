@@ -98,7 +98,7 @@ Entries 1 to 9 were reconstructed on 2026-11-18 from the session transcripts. Th
 - **Why it was a mistake:** the author reasonably thought they had missed something. The family claim is plausible but nobody had checked it.
 - **Implications:** confusion about what had been done, and an unchecked claim heading into the notes.
 - **How it was caught:** by the author ("Can't remember working on those models").
-- **Recovery:** I explained where each tokenizer comes from and removed the claim from the code comment. It is now a test for Step 2 Part B.
+- **Recovery:** I explained where each tokenizer comes from and removed the claim from the code comment. It is now a test for Step 2 Part B. Part B (2026-11-19) supports it: qwen3 matched Qwen2.5's token counts exactly on three different texts, and deepseek-r1 matched them plus 1 on all three. The Qwen technical report (arXiv 2309.16609) confirms that Qwen started from cl100k_base.
 - **Lesson:** link new material to what was actually done, say what is new, and mark guesses as guesses.
 
 ## 8. Wrong about which folder the terminal was in

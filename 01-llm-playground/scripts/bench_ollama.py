@@ -14,15 +14,13 @@ Prefill and decode run three times and report the median. Prints a markdown tabl
 
 import statistics
 import sys
-import time
 import uuid
 from dataclasses import dataclass
 
 from ollama import Client, ResponseError
 
-from playground.ollama_client import Timing, get_client
+from playground.ollama_client import STEP1_MODELS, Timing, get_client, unload
 
-DEFAULT_MODELS = ["llama3.2:3b", "qwen3:4b", "gemma3:4b", "deepseek-r1:7b"]
 RUNS = 3
 DECODE_TOKENS = 200
 
@@ -51,17 +49,6 @@ def fresh(prompt: str) -> str:
     computed at all, so its prefill rate would be meaningless.
     """
     return f"[run {uuid.uuid4().hex[:8]}] {prompt}"
-
-
-def unload(client: Client, model: str, timeout_s: float = 15.0) -> None:
-    """Ask Ollama to drop the model from memory, then wait until `ollama ps` agrees."""
-    client.generate(model=model, keep_alive=0)  # empty prompt + keep_alive 0 = unload
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        if all(m.model != model for m in client.ps().models):
-            return
-        time.sleep(0.2)
-    raise RuntimeError(f"{model} was still loaded after {timeout_s:.0f}s")
 
 
 def ask(client: Client, model: str, prompt: str, options: dict) -> Timing:
@@ -132,4 +119,4 @@ def main(models: list[str]) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:] or DEFAULT_MODELS)
+    main(sys.argv[1:] or STEP1_MODELS)
