@@ -10,6 +10,7 @@ import sys
 import time
 
 import torch
+from dotenv import load_dotenv
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from playground.device import pick_device
@@ -18,7 +19,14 @@ MODEL_NAME = "Qwen/Qwen2.5-0.5B"  # the base model: it continues text, it does n
 DEFAULT_PROMPT = "The capital of France is"
 
 
+def sync(device: torch.device) -> None:
+    """Wait until the GPU has finished all queued work. The CPU runs in order, so it needs none."""
+    if device.type == "mps":
+        torch.mps.synchronize()
+
+
 def main(prompt: str) -> None:
+    load_dotenv()  # so PLAYGROUND_DEVICE in .env works; values already exported in the shell win
     device = pick_device()
     print(f"Device: {device}")
 
@@ -37,9 +45,13 @@ def main(prompt: str) -> None:
 
     # 2. One forward pass. logits has shape (batch, sequence length, vocabulary size):
     #    one score for every vocabulary entry, at every position in the prompt.
+    #    The GPU runs work in the background: Python gets `logits` back before the GPU has
+    #    finished. synchronize() waits for it, so the timer measures the real work.
+    sync(device)
     start = time.perf_counter()
     with torch.inference_mode():
         logits = model(input_ids).logits
+    sync(device)
     print(
         f"\nForward pass: {(time.perf_counter() - start) * 1000:.0f} ms, "
         f"logits shape {tuple(logits.shape)}"

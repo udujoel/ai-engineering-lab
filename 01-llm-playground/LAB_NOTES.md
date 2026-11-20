@@ -76,7 +76,7 @@ All four land at 65 to 80% of the chip's 200 GB/s. Gemma downloads at 3.4 GB but
 
 **Finding 3: `--think=false` did not stop Qwen3 from thinking.** The server log names the model "Qwen3 4B Thinking 2507", a model trained to always reason. Ollama switched thinking off in the template, the model reasoned anyway, and the reasoning leaked into the visible answer (a lone `</think>` near the end). It saved only 217 tokens. A flag can ask for a behaviour; the weights decide.
 
-**Finding 4: most of the memory is the KV cache, not the model.** `ollama ps` showed 6.0 GB for a 2.0 GB model. Ollama reserves a KV cache for the full 32,768 token context up front. Figures from the server log:
+**Finding 4: at a 32k context, the KV cache can take more memory than the model.** `ollama ps` showed 6.0 GB for a 2.0 GB model. Ollama reserves a KV cache for the full 32,768 token context up front. Figures from the server log:
 
 | Model | Download | KV cache | In memory |
 |---|---|---|---|
@@ -293,7 +293,7 @@ What the chat template adds, per model:
 
 **Gemma matches none of the six**, as expected: its vocabulary is one we haven't loaded. It also splits numbers digit by digit (33 tokens for 28 digits).
 
-**The template cost is fixed per model.** Llama wraps every prompt in 24 extra tokens, DeepSeek in 2. For a short question Llama's wrapping is more than twice the question itself. Gemma's 9, 8, 9 is the only one that varies with the text; reason not known yet.
+**The template cost looks fixed per model, at least for these three texts.** Llama wraps every prompt in 24 extra tokens, DeepSeek in 2. For a short question Llama's wrapping is more than twice the question itself. Gemma's 9, 8, 9 is the only one that varies with the text; reason not known yet.
 
 My interpretation:
 1. Llama = GPT-4 + 1: "suggests it comes from the same GPT-4's with an extra token always added". The extra token is a start of text marker the runtime puts in front of every input; DeepSeek adds one too, Qwen3 doesn't. Llama's vocabulary is larger than GPT-4's: `ollama show llama3.2:3b --verbose` gives `llama.vocab_size 128256`, against GPT-4's 100,277. So it looks like GPT-4's plus about 28k extra entries. Yet on this Portuguese sentence the extras saved nothing: 14 + 1, the same as GPT-4.

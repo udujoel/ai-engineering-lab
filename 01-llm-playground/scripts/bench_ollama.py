@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 from ollama import Client, ResponseError
 
-from playground.ollama_client import STEP1_MODELS, Timing, get_client, unload
+from playground.ollama_client import STEP1_MODELS, Timing, get_client, same_model, unload
 
 RUNS = 3
 DECODE_TOKENS = 200
@@ -75,7 +75,7 @@ def bench(client: Client, model: str) -> Result:
     prefill = [ask(client, model, fresh(LONG_PROMPT), ONE_TOKEN) for _ in range(RUNS)]
     decode = [ask(client, model, DECODE_PROMPT, DECODE) for _ in range(RUNS)]
 
-    loaded = next(m for m in client.ps().models if m.model == model)
+    loaded = next(m for m in client.ps().models if same_model(m.model, model))
     return Result(
         model=model,
         cold_load_s=cold.load_s,

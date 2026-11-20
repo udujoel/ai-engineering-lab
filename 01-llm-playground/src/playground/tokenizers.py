@@ -95,6 +95,6 @@ def _tokenize_tiktoken(name: str, text: str) -> Tokens:
     ids = enc.encode(text, disallowed_special=())
     # tiktoken gives only where each token starts. Each token ends where the next one starts.
     _, starts = enc.decode_with_offsets(ids)
-    ends = [*starts[1:], len(text)]
+    ends = [*starts[1:], len(text)] if starts else []  # empty text: no tokens, no ends
     pieces = [text[start:end] for start, end in zip(starts, ends, strict=True)]
     return Tokens(name, enc.n_vocab, ids, pieces)

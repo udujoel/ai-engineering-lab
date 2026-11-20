@@ -53,6 +53,6 @@ A rerun of Llama alone gave 71.1 tok/s decode, so expect up to about 7% noise be
 
 - Decode speed follows model size: every token reads all the weights, and all four move 130 to 160 GB/s of the chip's 200 GB/s.
 - Prefill is only 10 to 12 times faster than decode on this GPU, because prefill is limited by arithmetic, not memory.
-- Most memory is KV cache, not weights. Gemma's sliding window attention cuts its cache to a fifth of Qwen3's.
+- At a 32k context the KV cache can outweigh the weights: Llama and Qwen3 hold more cache than model. DeepSeek and Gemma don't, and Gemma's sliding window attention cuts its cache to a fifth of Qwen3's.
 - Reasoning models spend most of their time thinking: Qwen3 wrote 1,145 tokens where Gemma wrote 56 for the same question, at the same speed per token.
 - Only one model fits in memory at a time with other apps open, so each model switch costs about 3 s of loading.
