@@ -73,7 +73,7 @@ I predicted that GPT-2 would not be consistent, and it was not. It split four di
 
 ## The hidden tokens in every chat
 
-The last experiment explained a mystery from part 2. The question "Explain what a token is in two sentences." is only 9 or 10 tokens in every tokenizer, yet Ollama counted between 13 and 35 prompt tokens for it. I asked each Ollama model to count the same texts twice, once raw and once wrapped in its chat template, and the difference is the template:
+The last experiment explained a mystery from part 2. The question "Explain what a token is in two sentences." is only 9 or 10 tokens in the six tokenizers above, and 10 or 11 in the four Ollama models when sent raw, yet Ollama counted between 13 and 35 prompt tokens for it in normal use. I asked each Ollama model to count the same texts twice, once raw and once wrapped in its chat template, and the difference is the template:
 
 | Model | Tokens added by the chat template |
 |---|---|

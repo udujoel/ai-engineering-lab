@@ -42,7 +42,7 @@ Before running the benchmark I predicted that Qwen3 would use the most memory, a
 
 ## Gemma's trick: sliding window attention
 
-The surprise came from Gemma. It has the largest download of the four models, but it used the least memory, only 2.8 GiB at the same 32k context. The server log showed why. Gemma 3 uses sliding window attention, so 29 of its 34 layers only look at the most recent 1,024 tokens, and only 5 layers keep the full context.
+The surprise came from Gemma. Its download is bigger than Llama's or Qwen3's, but it used the least memory of all four, only 2.8 GiB at the same 32k context as measured by the benchmark. The server log showed why. Gemma 3 uses sliding window attention, so 29 of its 34 layers only look at the most recent 1,024 tokens, and only 5 layers keep the full context.
 
 | Gemma KV cache | Layers | Positions | Size |
 |---|---|---|---|
