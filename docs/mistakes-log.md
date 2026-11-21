@@ -28,6 +28,9 @@ Entries 1 to 9 were reconstructed on 2026-11-18 from the session transcripts. Th
 | 9 | 2026-11-16 to 18 | All | Tool slips the author didn't see | Me | Fixed |
 | 10 | 2026-11-18 | P1 Step 2 | Told the author to expect a split emoji that didn't split | Me | Fixed |
 | 11 | 2026-11-18 | P1 Step 2 | Tokenizer explorer showed the same tokens differently by library | Me | Fixed |
+| 12 | 2026-11-16 | P1 Step 0 | Timed the GPU forward pass without waiting for the GPU | Review bots | Fixed |
+| 13 | 2026-11-16 to 19 | P1 Steps 0 to 2 | Three edge case bugs: `.env` device, untagged model names, empty text | Review bots | Fixed |
+| 14 | 2026-11-17 to 19 | P1 Steps 1 and 2 | Stated two findings more broadly than the data showed | Review bot | Fixed |
 
 ---
 
@@ -144,3 +147,39 @@ Entries 1 to 9 were reconstructed on 2026-11-18 from the session transcripts. Th
 - **How it was caught:** by me, comparing the two identical ID lists in the author's output.
 - **Recovery:** both adapters now use the same rule (a character is shown on the token that completes it), and the Hugging Face adapter uses `split_special_tokens=True`. A new test checks that Phi-4 mini and GPT-4o give identical IDs and pieces. 16 tests pass. The emoji pieces recorded in LAB_NOTES from that run used the old display; the counts and IDs there are correct.
 - **Lesson:** when two code paths should behave the same, test them against each other, not just each on its own. Pairs that share a vocabulary make a free check.
+
+## 12. Timed the GPU forward pass without waiting for the GPU
+
+- **Context:** Step 0 smoke test, which timed one forward pass of Qwen2.5 0.5B on `mps`. LAB_NOTES recorded 774 ms.
+- **What happened:** `scripts/smoke_test.py` stopped the timer as soon as `model(input_ids)` returned. On the Apple GPU, PyTorch queues work and returns before the GPU has finished, so the timer could stop early.
+- **Why it was a mistake:** GPU work is asynchronous. A timing has to wait for the device (`torch.mps.synchronize()`) before reading the clock, or it measures how fast work was queued, not how fast it ran.
+- **Implications:** the 774 ms in Step 0 may be too low. Nothing else depends on it, and the Ollama numbers in Step 1 come from the server's own timers, so they are unaffected.
+- **How it was caught:** by two review bots (Devin and CodeRabbit) on PR #1, 2026-11-20.
+- **Recovery:** the script now synchronizes before starting and before stopping the timer. Rerunning the smoke test will give the corrected number for LAB_NOTES.
+- **Lesson:** every GPU timing needs a synchronize on both sides. This matters for Step 3, where the KV cache experiment times decoding on `mps`.
+
+## 13. Three edge case bugs: `.env` device, untagged model names, empty text
+
+- **Context:** code written in Steps 0 to 2.
+- **What happened:**
+  - `device.py` documents that `PLAYGROUND_DEVICE` can be set in `.env`, but nothing on the smoke test's path loaded `.env`.
+  - `bench_ollama.py` and `unload()` compared model names exactly. Ollama lists `llama3.2` as `llama3.2:latest`, so an untagged name would crash the benchmark at the end, and `unload()` could return before the model was gone.
+  - The tiktoken adapter in `tokenizers.py` crashed on empty text instead of returning zero tokens.
+  - `HF_TOKEN` in `.env` was never loaded for the tokenizers either.
+  - `bench_ollama.py` paired the median decode rate with the minimum token count. Every run hit the full 200 tokens, so the recorded table is right, but a run that stopped early would have been misreported.
+- **Why it was a mistake:** each one is a promise in a docstring or an obvious input that was never tested.
+- **Implications:** none of the recorded results: Du always passed full tags, never used the `.env` device setting, and never tokenized empty text. The empty text bug would have crashed the Streamlit page in Part C, which starts with an empty box.
+- **How it was caught:** by Devin and CodeRabbit on PR #1, 2026-11-20.
+- **Recovery:** the smoke test loads `.env` (shell values still win), a new `same_model()` treats a missing tag as `latest`, and empty text returns no tokens. New tests cover the name matching and empty text.
+- **Lesson:** test the edges a user will hit first: empty input, the short form of a name, and every setting the docs advertise.
+
+## 14. Stated two findings more broadly than the data showed
+
+- **Context:** Step 1 Finding 4 and the README, and Step 2 Part B's template cost.
+- **What happened:** the README said "Most memory is KV cache, not weights", and LAB_NOTES said "The template cost is fixed per model".
+- **Why it was a mistake:** the KV cache is larger than the weights only for Llama and Qwen3. DeepSeek (1.75 GiB cache, 4.7 GB model) and Gemma (0.8 GiB cache) are the other way round. And Gemma's template cost varied (9, 8, 9), on only three texts.
+- **Implications:** a blog post written from the notes would have carried the overstatement.
+- **Also:** cubic found four smaller imprecisions in LAB_NOTES: "outputs a probability" (the model outputs logits; softmax makes them probabilities), 151,936 called tokens (they are vocabulary slots, 151,665 used by the tokenizer), a time-to-answer formula without prefill, and a KV cache formula with a fixed head dimension of 128 (Gemma's is 256).
+- **How it was caught:** by CodeRabbit and cubic on PR #1, 2026-11-20.
+- **Recovery:** all of these are reworded, and both statements now say what the data supports: the cache can outweigh the weights at a 32k context, and the template cost looks fixed for these three texts.
+- **Lesson:** a finding is only as general as the models and texts behind it. Say which ones.

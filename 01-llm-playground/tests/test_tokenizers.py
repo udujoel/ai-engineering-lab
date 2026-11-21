@@ -29,6 +29,13 @@ def test_same_ids_display_the_same_pieces():
     assert phi.pieces == gpt4o.pieces
 
 
+@pytest.mark.slow
+@pytest.mark.parametrize("name", ALL)
+def test_empty_text_has_no_tokens(name):
+    # The Streamlit page starts with an empty box, so this must not crash.
+    assert tokenize(name, "").count == 0
+
+
 def test_unknown_tokenizer_is_a_clear_error():
     with pytest.raises(KeyError, match="Choose from"):
         tokenize("not-a-tokenizer", "hi")

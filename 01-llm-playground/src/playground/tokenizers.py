@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from functools import cache
 
 import tiktoken
+from dotenv import load_dotenv
 from transformers import AutoTokenizer
 
 # Hugging Face repos. Only the tokenizer files are downloaded (a few MB each), never the weights.
@@ -57,6 +58,7 @@ def tokenize(name: str, text: str) -> Tokens:
 # doesn't reload it on every keystroke.
 @cache
 def _hf(name: str):
+    load_dotenv()  # HF_TOKEN in .env, needed only for gated tokenizers; shell values win
     return AutoTokenizer.from_pretrained(HF_TOKENIZERS[name])
 
 
@@ -95,6 +97,6 @@ def _tokenize_tiktoken(name: str, text: str) -> Tokens:
     ids = enc.encode(text, disallowed_special=())
     # tiktoken gives only where each token starts. Each token ends where the next one starts.
     _, starts = enc.decode_with_offsets(ids)
-    ends = [*starts[1:], len(text)]
+    ends = [*starts[1:], len(text)] if starts else []  # empty text: no tokens, no ends
     pieces = [text[start:end] for start, end in zip(starts, ends, strict=True)]
     return Tokens(name, enc.n_vocab, ids, pieces)

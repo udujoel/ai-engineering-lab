@@ -6,7 +6,7 @@ No server needed: the response below is the llama3.2:3b run from step 1, part B.
 import pytest
 from ollama import GenerateResponse
 
-from playground.ollama_client import Timing, tokens_per_second
+from playground.ollama_client import Timing, same_model, tokens_per_second
 
 
 def test_tokens_per_second_matches_ollama_cli():
@@ -34,3 +34,10 @@ def test_timing_from_response():
     assert t.prefill_tps == pytest.approx(142.30, abs=0.01)
     assert t.decode_tps == pytest.approx(72.92, abs=0.01)
     assert t.total_s == pytest.approx(4.134, abs=0.001)
+
+
+def test_same_model_treats_missing_tag_as_latest():
+    assert same_model("llama3.2", "llama3.2:latest")
+    assert same_model("qwen3:4b", "qwen3:4b")
+    assert not same_model("llama3.2", "llama3.2:3b")
+    assert same_model("library/llama3.2", "library/llama3.2:latest")
