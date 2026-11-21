@@ -69,7 +69,7 @@ Numbers turned the ranking upside down. GPT-2 was the cheapest on the numbers li
 | One token per digit | Qwen2.5, SmolLM2 | `1` `2` `3` `4` `5` `6` `7` |
 | Groups of three from the left | GPT-4, GPT-4o, Phi-4 mini | `123` `456` `7` |
 
-I predicted that GPT-2 would not be consistent, and it was not. It split four different seven digit numbers in four different ways. Worse, the same token can mean different things, since `45` stands for different place values in 1234567 and 2345678. To add two numbers a model has to line up the place values, and GPT-2's tokens hide them. Grouping by three has a subtler problem, because `123` means millions in 1234567 but thousands in 123456, so the model needs the length of the number to read any group. Only one token per digit always keeps place value visible. My conclusion was that splitting every digit is worth the extra tokens for maths, even though it spent 28 tokens on 28 digits where groups of three spent 15. Fewer tokens is not the same as more useful tokens.
+I predicted that GPT-2 would not be consistent, and it was not. It split four different seven digit numbers in four different ways. Worse, the same token can mean different things, since `45` stands for different place values in 1234567 and 2345678. To add two numbers a model has to line up the place values, and GPT-2's tokens hide them. Grouping by three has a subtler problem, because `123` means millions in 1234567 but thousands in 123456, so the model needs the length of the number to read any group. One token per digit does not remove that need, because a `1` can still mean millions or hundred thousands depending on the length, but it means every digit sits in its own token, so the units digit is always the last token and two numbers can be lined up digit by digit from the right. My conclusion was that splitting every digit is worth the extra tokens for maths, even though it spent 28 tokens on 28 digits where groups of three spent 15. Fewer tokens is not the same as more useful tokens.
 
 ## The hidden tokens in every chat
 
@@ -91,7 +91,7 @@ The raw counts were also a nice bit of detective work. Qwen3 matched Qwen2.5 exa
 - Tokenizers agree on English and disagree everywhere else, so test on the languages and formats you will actually serve.
 - A language tax of 24% to 86% is a real cost in money, latency and context, and choosing the tokenizer is choosing who pays it.
 - How a tokenizer splits numbers affects what a model can learn about arithmetic, not just how many tokens it uses.
-- Chat templates add a fixed overhead to every request, which matters most for short prompts at high volume.
+- Chat templates add tokens to every request, almost the same number each time for most models, and that overhead matters most for short prompts at high volume.
 
 ## Next in the series
 
