@@ -1,3 +1,7 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>LLM Engineering Flight Deck</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -245,6 +249,8 @@ input[type="range"]:active::-moz-range-thumb { background: var(--hot); }
   .rag aside { border-left: 0; border-top: 1px solid var(--ink-5); max-height: 220px; }
   .agent { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
   .trace { border-left: 0; border-top: 1px solid var(--ink-5); }
+  .ctl { flex-wrap: wrap; max-width: 100%; }
+  .seg { row-gap: 6px; }
 }
 
 /* path: groups and status */
@@ -894,7 +900,7 @@ function makeDecoding(stage, ctl) {
   })
   const strip = h("div", { class: "strip", "aria-label": "Recent samples" })
   stage.append(h("div", { class: "inst samp" }, h("span", { class: "tag" }, "measured distribution · Step 0 · sampling runs in your browser"), prompt, bars, h("div", {}, h("span", { class: "cap" }, "last samples · orange ticks show how often each was drawn"), strip)))
-  const reset = () => { counts = [0, 0, 0, 0, 0]; total = 0; samples = []; strip.replaceChildren(); dirty = true }
+  const reset = () => { counts = [0, 0, 0, 0, 0]; total = 0; samples = []; strip.replaceChildren(); next.textContent = "…"; flash = -1; dirty = true }
   const update = () => { dist = decode(T, mode === "top k" ? K : 5, mode === "top p" ? P : 1, mode === "greedy"); reset() }
   function sample() {
     let r = Math.random(), k = 0
@@ -1258,7 +1264,7 @@ function makeRag(stage, ctl) {
     return { list: top, recall: g / gold, precision: g / k }
   }
   const refreshList = () => {
-    const key = res.list.map((r) => r.d.id).join() + k + rerank
+    const key = res.list.map((r) => `${r.d.id}:${(clamp(1 - r.dist * 1.6, 0, 1) * 100).toFixed(0)}`).join() + k + rerank
     if (key === lastKey) return
     lastKey = key
     list.replaceChildren(...res.list.map((r, i) => {
@@ -1288,6 +1294,7 @@ function makeRag(stage, ctl) {
       res = retrieve()
       refreshList()
       const { ctx, w, h: H } = c
+      if (w <= 40 || H <= 90) return
       ctx.clearRect(0, 0, w, H)
       const X = (x) => 20 + x * (w - 40), Y = (y) => 70 + y * (H - 90)
       graticule(ctx, w, H)
@@ -1386,7 +1393,7 @@ function makeAgent(stage, ctl) {
     btn("inject tool error", () => (injectErr = true)),
   )
   function nextStep() {
-    if (pending.length) return pending.shift()
+    if (pending.length) { if (pending[0].notBefore && performance.now() < pending[0].notBefore) return null; return pending.shift() }
     if (idx >= SCRIPT.length) { idx = 0; return { ph: "done", txt: "Run complete. Summary posted to #incidents.", done: true } }
     const s = SCRIPT[idx++]
     if (s.gated && guard) {
@@ -1395,12 +1402,13 @@ function makeAgent(stage, ctl) {
     }
     if (s.ph === "act" && injectErr) {
       injectErr = false
-      pending.push({ ph: "observe", txt: "error 429: too many requests", err: true }, { ph: "reflect", txt: "Transient. Back off 2s and retry once." }, { ph: "act", txt: s.txt + " (retry)" })
+      pending.push({ ph: "observe", txt: "error 429: too many requests", err: true }, { ph: "reflect", txt: "Transient. Back off 2s and retry once." }, { ph: "act", txt: s.txt + " (retry)", backoff: true })
     }
     if (s.gated && !guard) return { ...s, txt: s.txt + "  · ran without approval", err: true }
     return s
   }
   function push(s) {
+    if (s.err && s.ph === "observe") { const r = pending.find((x) => x.backoff); if (r) r.notBefore = performance.now() + 2000 }
     steps++
     if (s.ph === "act") tools++
     if (s.ph === "gate" && s.txt.startsWith("approved")) approvals++
@@ -1413,7 +1421,7 @@ function makeAgent(stage, ctl) {
   }
   return {
     frame(t) {
-      if (t - last > speed) { last = t; push(nextStep()) }
+      if (t - last > speed) { const s = nextStep(); if (s) { last = t; push(s) } }
       gateLink.style.display = nodes.gate.g.style.display = guard ? "" : "none"
       for (const [k, n] of Object.entries(nodes)) {
         const on = k === to
@@ -1688,8 +1696,8 @@ function renderTray() {
   tray.innerHTML = `<span><b>${MODULES[active].n}</b> ${MODULES[active].name}</span>` + items.map(([k, v, isHot]) => `<span class="${isHot ? "hot" : ""}">${k} <b>${v}</b></span>`).join("") + `<span class="hint">← → switch modules</span>`
 }
 function loop(t) {
-  current?.frame?.(t)
   requestAnimationFrame(loop)
+  try { current?.frame?.(t) } catch (err) { console.error(err) }
 }
 document.addEventListener("keydown", (e) => {
   if (e.target.closest("textarea, input, [role=slider]")) return
