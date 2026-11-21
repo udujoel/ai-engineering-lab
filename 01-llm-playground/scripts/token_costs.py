@@ -31,17 +31,21 @@ def main() -> None:
 
     print("Characters per sample:", {k: len(v) for k, v in SAMPLES.items()}, "\n")
     print("Tokens")
-    print(df.pivot(index="tokenizer", columns="sample", values="tokens").loc[ALL, list(SAMPLES)])
+    print(
+        df.pivot(index="tokenizer", columns="sample", values="tokens").reindex(
+            index=ALL, columns=list(SAMPLES)
+        )
+    )
     print("\nTokens per character (lower is cheaper)")
     tpc = df.pivot(index="tokenizer", columns="sample", values="tokens_per_char")
-    print(tpc.loc[ALL, list(SAMPLES)].round(3))
+    print(tpc.reindex(index=ALL, columns=list(SAMPLES)).round(3))
 
     penalty = language_penalty(costs)
     print("\nPortuguese tokens / English tokens (same paragraph, 1.0 = no penalty)")
     for name, ratio in sorted(penalty.items(), key=lambda kv: kv[1]):
         print(f"  {name:<11} {ratio:.2f}")
 
-    RESULTS.mkdir(exist_ok=True)
+    RESULTS.mkdir(parents=True, exist_ok=True)
     data = {
         "samples": {k: {"characters": len(v), "text": v} for k, v in SAMPLES.items()},
         "costs": [c.as_dict() for c in costs],

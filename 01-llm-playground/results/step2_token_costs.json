@@ -1,0 +1,290 @@
+{
+  "samples": {
+    "english": {
+      "characters": 270,
+      "text": "The harbour town woke slowly. Fishing boats left before dawn, and the bakery on the corner opened its shutters as the first light reached the hills. By mid morning the market was full of voices, crates of fish and the smell of coffee drifting from the cafe by the water."
+    },
+    "portuguese": {
+      "characters": 275,
+      "text": "A vila do porto acordou devagar. Os barcos de pesca saíram antes do amanhecer, e a padaria da esquina abriu as portadas quando a primeira luz chegou às colinas. A meio da manhã o mercado estava cheio de vozes, caixas de peixe e o cheiro a café que vinha do café junto à água."
+    },
+    "python": {
+      "characters": 240,
+      "text": "def tokens_per_second(count: int, duration_ns: int) -> float:\n    \"\"\"Tokens divided by seconds. Returns 0.0 when nothing was timed.\"\"\"\n    if not count or not duration_ns:\n        return 0.0\n    return count / (duration_ns / 1_000_000_000)\n"
+    },
+    "json": {
+      "characters": 157,
+      "text": "{\"model\": \"qwen3:4b\", \"created_at\": \"2026-11-19T22:37:05Z\", \"done\": true, \"prompt_eval_count\": 24, \"eval_count\": 1, \"options\": {\"temperature\": 0, \"seed\": 0}}"
+    },
+    "numbers": {
+      "characters": 77,
+      "text": "Order 1234567 shipped on 2026-11-20 at 14:05 for $1,299.99, a 12.5% discount."
+    },
+    "emoji": {
+      "characters": 33,
+      "text": "Great job 👍🏽 see you soon 🙂 🇵🇹 ❤️"
+    }
+  },
+  "costs": [
+    {
+      "tokenizer": "gpt2",
+      "sample": "english",
+      "characters": 270,
+      "tokens": 56,
+      "tokens_per_char": 0.2074
+    },
+    {
+      "tokenizer": "gpt2",
+      "sample": "portuguese",
+      "characters": 275,
+      "tokens": 104,
+      "tokens_per_char": 0.3782
+    },
+    {
+      "tokenizer": "gpt2",
+      "sample": "python",
+      "characters": 240,
+      "tokens": 86,
+      "tokens_per_char": 0.3583
+    },
+    {
+      "tokenizer": "gpt2",
+      "sample": "json",
+      "characters": 157,
+      "tokens": 67,
+      "tokens_per_char": 0.4268
+    },
+    {
+      "tokenizer": "gpt2",
+      "sample": "numbers",
+      "characters": 77,
+      "tokens": 31,
+      "tokens_per_char": 0.4026
+    },
+    {
+      "tokenizer": "gpt2",
+      "sample": "emoji",
+      "characters": 33,
+      "tokens": 20,
+      "tokens_per_char": 0.6061
+    },
+    {
+      "tokenizer": "qwen2.5",
+      "sample": "english",
+      "characters": 270,
+      "tokens": 56,
+      "tokens_per_char": 0.2074
+    },
+    {
+      "tokenizer": "qwen2.5",
+      "sample": "portuguese",
+      "characters": 275,
+      "tokens": 85,
+      "tokens_per_char": 0.3091
+    },
+    {
+      "tokenizer": "qwen2.5",
+      "sample": "python",
+      "characters": 240,
+      "tokens": 72,
+      "tokens_per_char": 0.3
+    },
+    {
+      "tokenizer": "qwen2.5",
+      "sample": "json",
+      "characters": 157,
+      "tokens": 73,
+      "tokens_per_char": 0.465
+    },
+    {
+      "tokenizer": "qwen2.5",
+      "sample": "numbers",
+      "characters": 77,
+      "tokens": 49,
+      "tokens_per_char": 0.6364
+    },
+    {
+      "tokenizer": "qwen2.5",
+      "sample": "emoji",
+      "characters": 33,
+      "tokens": 15,
+      "tokens_per_char": 0.4545
+    },
+    {
+      "tokenizer": "smollm2",
+      "sample": "english",
+      "characters": 270,
+      "tokens": 58,
+      "tokens_per_char": 0.2148
+    },
+    {
+      "tokenizer": "smollm2",
+      "sample": "portuguese",
+      "characters": 275,
+      "tokens": 104,
+      "tokens_per_char": 0.3782
+    },
+    {
+      "tokenizer": "smollm2",
+      "sample": "python",
+      "characters": 240,
+      "tokens": 79,
+      "tokens_per_char": 0.3292
+    },
+    {
+      "tokenizer": "smollm2",
+      "sample": "json",
+      "characters": 157,
+      "tokens": 77,
+      "tokens_per_char": 0.4904
+    },
+    {
+      "tokenizer": "smollm2",
+      "sample": "numbers",
+      "characters": 77,
+      "tokens": 49,
+      "tokens_per_char": 0.6364
+    },
+    {
+      "tokenizer": "smollm2",
+      "sample": "emoji",
+      "characters": 33,
+      "tokens": 22,
+      "tokens_per_char": 0.6667
+    },
+    {
+      "tokenizer": "phi-4-mini",
+      "sample": "english",
+      "characters": 270,
+      "tokens": 55,
+      "tokens_per_char": 0.2037
+    },
+    {
+      "tokenizer": "phi-4-mini",
+      "sample": "portuguese",
+      "characters": 275,
+      "tokens": 68,
+      "tokens_per_char": 0.2473
+    },
+    {
+      "tokenizer": "phi-4-mini",
+      "sample": "python",
+      "characters": 240,
+      "tokens": 66,
+      "tokens_per_char": 0.275
+    },
+    {
+      "tokenizer": "phi-4-mini",
+      "sample": "json",
+      "characters": 157,
+      "tokens": 65,
+      "tokens_per_char": 0.414
+    },
+    {
+      "tokenizer": "phi-4-mini",
+      "sample": "numbers",
+      "characters": 77,
+      "tokens": 35,
+      "tokens_per_char": 0.4545
+    },
+    {
+      "tokenizer": "phi-4-mini",
+      "sample": "emoji",
+      "characters": 33,
+      "tokens": 14,
+      "tokens_per_char": 0.4242
+    },
+    {
+      "tokenizer": "gpt-4",
+      "sample": "english",
+      "characters": 270,
+      "tokens": 56,
+      "tokens_per_char": 0.2074
+    },
+    {
+      "tokenizer": "gpt-4",
+      "sample": "portuguese",
+      "characters": 275,
+      "tokens": 88,
+      "tokens_per_char": 0.32
+    },
+    {
+      "tokenizer": "gpt-4",
+      "sample": "python",
+      "characters": 240,
+      "tokens": 66,
+      "tokens_per_char": 0.275
+    },
+    {
+      "tokenizer": "gpt-4",
+      "sample": "json",
+      "characters": 157,
+      "tokens": 65,
+      "tokens_per_char": 0.414
+    },
+    {
+      "tokenizer": "gpt-4",
+      "sample": "numbers",
+      "characters": 77,
+      "tokens": 35,
+      "tokens_per_char": 0.4545
+    },
+    {
+      "tokenizer": "gpt-4",
+      "sample": "emoji",
+      "characters": 33,
+      "tokens": 19,
+      "tokens_per_char": 0.5758
+    },
+    {
+      "tokenizer": "gpt-4o",
+      "sample": "english",
+      "characters": 270,
+      "tokens": 55,
+      "tokens_per_char": 0.2037
+    },
+    {
+      "tokenizer": "gpt-4o",
+      "sample": "portuguese",
+      "characters": 275,
+      "tokens": 68,
+      "tokens_per_char": 0.2473
+    },
+    {
+      "tokenizer": "gpt-4o",
+      "sample": "python",
+      "characters": 240,
+      "tokens": 66,
+      "tokens_per_char": 0.275
+    },
+    {
+      "tokenizer": "gpt-4o",
+      "sample": "json",
+      "characters": 157,
+      "tokens": 65,
+      "tokens_per_char": 0.414
+    },
+    {
+      "tokenizer": "gpt-4o",
+      "sample": "numbers",
+      "characters": 77,
+      "tokens": 35,
+      "tokens_per_char": 0.4545
+    },
+    {
+      "tokenizer": "gpt-4o",
+      "sample": "emoji",
+      "characters": 33,
+      "tokens": 14,
+      "tokens_per_char": 0.4242
+    }
+  ],
+  "portuguese_penalty": {
+    "gpt2": 1.857,
+    "qwen2.5": 1.518,
+    "smollm2": 1.793,
+    "phi-4-mini": 1.236,
+    "gpt-4": 1.571,
+    "gpt-4o": 1.236
+  }
+}
