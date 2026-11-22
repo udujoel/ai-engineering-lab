@@ -5,14 +5,14 @@ part: 5
 date: 2026-11-21
 description: "Fourteen logged mistakes from the AI assistant I studied with: what happened, why, how each was caught and corrected, and what it means for engineers who rely on AI."
 tags: [llm, ai-assisted-engineering, code-review, learning-in-public, ai-infrastructure]
-demo: https://claude.ai/artifact/C3tmEfxasHsveeyUkNhiue
+demo: https://www.joeludu.com/demos/llm-flight-deck.html
 ---
 
 # What my AI study assistant got wrong
 
 *Part 5 of Inside the LLM Playground, a series on what I learned building a small LLM lab on my laptop as I move towards AI infrastructure engineering.*
 
-> **The demo.** The results these mistakes touched are all in the [LLM Engineering Flight Deck](https://claude.ai/artifact/C3tmEfxasHsveeyUkNhiue). The forward pass timing in its first station is the corrected one from mistake 12 below.
+> **The demo.** The results these mistakes touched are all in the [LLM Engineering Flight Deck](https://www.joeludu.com/demos/llm-flight-deck.html). The forward pass timing in its first station is the corrected one from mistake 12 below.
 
 ## Why I kept a mistakes log
 

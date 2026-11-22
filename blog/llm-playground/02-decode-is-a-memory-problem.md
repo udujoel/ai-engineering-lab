@@ -5,14 +5,14 @@ part: 2
 date: 2026-11-21
 description: "Benchmarking four local models through Ollama on an M2 Pro: why decode speed follows model size, why prefill is only 10 to 12 times faster, and what thinking tokens really cost."
 tags: [llm, ai-infrastructure, inference, ollama, benchmarking, learning-in-public]
-demo: https://claude.ai/artifact/C3tmEfxasHsveeyUkNhiue
+demo: https://www.joeludu.com/demos/llm-flight-deck.html#models
 ---
 
 # Decode is a memory problem
 
 *Part 2 of Inside the LLM Playground, a series on what I learned building a small LLM lab on my laptop as I move towards AI infrastructure engineering.*
 
-> **Try it as you read.** The "Local models" station of the [LLM Engineering Flight Deck](https://claude.ai/artifact/C3tmEfxasHsveeyUkNhiue) races the four models from this post at the speeds I measured, and it has a bandwidth chart that predicts how fast they would run on other chips.
+> **Try it as you read.** The "Local models" station of the [LLM Engineering Flight Deck](https://www.joeludu.com/demos/llm-flight-deck.html#models) races the four models from this post at the speeds I measured, and it has a bandwidth chart that predicts how fast they would run on other chips.
 
 ## The setup
 

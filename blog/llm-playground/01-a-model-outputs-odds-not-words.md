@@ -5,14 +5,14 @@ part: 1
 date: 2026-11-21
 description: "The first look inside a language model: one forward pass, 151,936 scores, and why Paris only wins with 31.6%."
 tags: [llm, ai-infrastructure, pytorch, apple-silicon, learning-in-public]
-demo: https://claude.ai/artifact/C3tmEfxasHsveeyUkNhiue
+demo: https://www.joeludu.com/demos/llm-flight-deck.html#inside
 ---
 
 # A model outputs odds, not words
 
 *Part 1 of Inside the LLM Playground, a series on what I learned building a small LLM lab on my laptop as I move towards AI infrastructure engineering.*
 
-> **Try it as you read.** Everything in this series is also in an interactive demo, the [LLM Engineering Flight Deck](https://claude.ai/artifact/C3tmEfxasHsveeyUkNhiue). This post goes with its first station, "Inside a model", where you can watch the forward pass climb the layers and see the real top five guesses from my run.
+> **Try it as you read.** Everything in this series is also in an interactive demo, the [LLM Engineering Flight Deck](https://www.joeludu.com/demos/llm-flight-deck.html#inside). This post goes with its first station, "Inside a model", where you can watch the forward pass climb the layers and see the real top five guesses from my run.
 
 ## Why I started here
 

@@ -5,14 +5,14 @@ part: 3
 date: 2026-11-21
 description: "Why a 2 GB model used 6 GB of memory, how to calculate the KV cache, and how Gemma's sliding window attention shrank its cache to a fifth of Qwen3's."
 tags: [llm, ai-infrastructure, kv-cache, memory, ollama, learning-in-public]
-demo: https://claude.ai/artifact/C3tmEfxasHsveeyUkNhiue
+demo: https://www.joeludu.com/demos/llm-flight-deck.html#models
 ---
 
 # Where the memory goes: the KV cache
 
 *Part 3 of Inside the LLM Playground, a series on what I learned building a small LLM lab on my laptop as I move towards AI infrastructure engineering.*
 
-> **Try it as you read.** The "Local models" station of the [LLM Engineering Flight Deck](https://claude.ai/artifact/C3tmEfxasHsveeyUkNhiue) has a KV cache slider. Drag the context length and watch each model's cache grow, then see how Gemma's sliding window changes the curve. At 32k it matches the figures from my server log.
+> **Try it as you read.** The "Local models" station of the [LLM Engineering Flight Deck](https://www.joeludu.com/demos/llm-flight-deck.html#models) has a KV cache slider. Drag the context length and watch each model's cache grow, then see how Gemma's sliding window changes the curve. At 32k it matches the figures from my server log.
 
 ## A 2 GB model using 6 GB
 

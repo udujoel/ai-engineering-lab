@@ -5,14 +5,14 @@ part: 4
 date: 2026-11-21
 description: "Six tokenizers, one paragraph in English and Portuguese: a 24% to 86% language tax, three ways to split a number, and the hidden tokens in every chat template."
 tags: [llm, ai-infrastructure, tokenizers, multilingual, cost, learning-in-public]
-demo: https://claude.ai/artifact/C3tmEfxasHsveeyUkNhiue
+demo: https://www.joeludu.com/demos/llm-flight-deck.html#tokens
 ---
 
 # The same meaning has different prices
 
 *Part 4 of Inside the LLM Playground, a series on what I learned building a small LLM lab on my laptop as I move towards AI infrastructure engineering.*
 
-> **Try it as you read.** The "Tokenizers" station of the [LLM Engineering Flight Deck](https://claude.ai/artifact/C3tmEfxasHsveeyUkNhiue) shows all six texts from this post, the Portuguese penalty, the three ways of splitting digits and the hidden chat template costs, all from my measured results.
+> **Try it as you read.** The "Tokenizers" station of the [LLM Engineering Flight Deck](https://www.joeludu.com/demos/llm-flight-deck.html#tokens) shows all six texts from this post, the Portuguese penalty, the three ways of splitting digits and the hidden chat template costs, all from my measured results.
 
 ## Why tokens matter for infrastructure
 

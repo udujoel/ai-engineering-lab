@@ -2,7 +2,7 @@
 
 A blog series written from Project 1 of this lab (`01-llm-playground/`). Each post is drawn from `LAB_NOTES.md`, `docs/mistakes-log.md` and the measured results, and every number in it comes from a real run on a MacBook Pro with an M2 Pro and 32 GB of memory.
 
-**Interactive demo:** [LLM Engineering Flight Deck](https://claude.ai/artifact/C3tmEfxasHsveeyUkNhiue). A self hosted copy is in [`demo/flight-deck.html`](demo/flight-deck.html), a single HTML file that can be dropped onto a personal site as it is.
+**Interactive demo:** [LLM Engineering Flight Deck](https://www.joeludu.com/demos/llm-flight-deck.html). A self hosted copy is in [`demo/flight-deck.html`](demo/flight-deck.html), a single HTML file that can be dropped onto a personal site as it is.
 
 | Part | Post | Demo station |
 |---|---|---|
