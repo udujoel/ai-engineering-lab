@@ -14,7 +14,7 @@
   --bg: #060606;
   --ink: #f3f2ee;
   --ink-2: rgb(243 242 238 / 0.64);
-  --ink-3: rgb(243 242 238 / 0.40);
+  --ink-3: rgb(243 242 238 / 0.52); /* about 5:1 on --bg, enough for small functional text */
   --ink-4: rgb(243 242 238 / 0.22);
   --ink-5: rgb(243 242 238 / 0.10);
   --hot: #ff5a1f;
@@ -111,7 +111,7 @@ footer {
 }
 footer b { color: var(--ink); font-weight: 500; }
 footer .hot b { color: var(--hot); }
-footer .hint { margin-left: auto; color: var(--ink-4); }
+footer .hint { margin-left: auto; color: var(--ink-3); }
 
 .ctl { display: flex; align-items: center; gap: 10px; font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
 .ctl output { color: var(--ink); min-width: 6ch; text-transform: none; letter-spacing: 0; }
@@ -172,7 +172,8 @@ input[type="range"]:active::-moz-range-thumb { background: var(--hot); }
 .att-body svg { width: 100%; height: 100%; }
 .att-heat { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
 .att-heat .note { font-size: 10px; color: var(--ink-3); }
-.att-svg text { font-family: var(--mono); font-size: 13px; fill: var(--ink); cursor: default; }
+.att-svg text { font-family: var(--mono); font-size: 13px; cursor: default; }
+.att-svg text:not([fill]) { fill: var(--ink); } /* frame() sets fill on token labels; a blanket rule would override it */
 .att-svg .hd { font-size: 9px; fill: var(--ink-3); letter-spacing: 0.1em; }
 
 /* 04 sampling */
@@ -681,8 +682,12 @@ function makeModels(stage, ctl) {
         btn("race again", restart))
     } else if (v === "bandwidth") {
       const cw = h("div", { class: "cvwrap" }); wrap.append(cw); c = makeCanvas(cw)
-      const s = slider({ label: "memory bandwidth", min: 100, max: 1100, step: 10, value: bw, fmt: (x) => x + " GB/s", onInput: (x) => (bw = x) })
-      const presets = seg({ label: "chip", options: ["M2 Pro 200", "M4 Max 546", "RTX 4090 1008"], value: "M2 Pro 200", onChange: (o) => { bw = parseInt(o.split(" ").pop()); s.set(bw) } })
+      const s = slider({ label: "memory bandwidth", min: 100, max: 1100, step: 1, value: bw, fmt: (x) => x + " GB/s", onInput: (x) => { bw = x; syncChip() } })
+      const CHIPS = ["M2 Pro 200", "M4 Max 546", "RTX 4090 1008"]
+      const presets = seg({ label: "chip", options: CHIPS, value: null, onChange: (o) => { bw = parseInt(o.split(" ").pop()); s.set(bw) } })
+      // The pressed chip always follows bw, and none is pressed when bw matches no preset.
+      const syncChip = () => presets.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(parseInt(b.textContent.split(" ").pop()) === bw)))
+      syncChip()
       sub.append(s, presets)
     } else {
       kvBox = h("div", { class: "kv" }); wrap.append(kvBox)
@@ -1077,11 +1082,12 @@ function makeAttention(stage, ctl) {
     return t
   })
   const heatWrap = h("div", { class: "fill" })
-  const heat = h("div", { class: "att-heat" }, h("span", { class: "cap" }, "all heads · this layer"), h("div", { style: "position:relative" }, heatWrap), h("span", { class: "note" }, "Upper triangle is masked. A token can never look ahead."))
+  const heatCap = h("span", { class: "cap" }, head + " head · this layer")
+  const heat = h("div", { class: "att-heat" }, heatCap, h("div", { style: "position:relative" }, heatWrap), h("span", { class: "note" }, "Upper triangle is masked. A token can never look ahead."))
   const root = h("div", { class: "inst att" }, line, h("div", { class: "att-body" }, svg, heat))
   stage.append(root)
   const hc = makeCanvas(heatWrap)
-  ctl.append(seg({ label: "head", options: ["coreference", "syntax", "previous token"], value: head, onChange: (v) => (head = v) }))
+  ctl.append(seg({ label: "head", options: ["coreference", "syntax", "previous token"], value: head, onChange: (v) => { head = v; heatCap.textContent = v + " head · this layer" } }))
   function drawHeat(q) {
     const { ctx, w, h: H } = hc
     ctx.clearRect(0, 0, w, H)
@@ -1221,7 +1227,7 @@ function makeContext(stage, ctl) {
     },
     telemetry() {
       const dropped = plan.droppedTurns || plan.droppedDocs
-      return [["used", `${plan.total.toLocaleString("en")} / ${win.toLocaleString("en")}`], ["fill", Math.round((plan.total / win) * 100) + "%", plan.total / win > 0.9], ["dropped turns", plan.droppedTurns, dropped], ["dropped docs", plan.droppedDocs, plan.droppedDocs > 0], ["input cost per call", "$" + (((plan.total - plan.tok.reserve) * 3) / 1e6).toFixed(4)]]
+      return [["used", `${plan.total.toLocaleString("en")} / ${win.toLocaleString("en")}`], ["fill", Math.round((plan.total / win) * 100) + "%", plan.total / win > 0.9], ["dropped turns", plan.droppedTurns, dropped], ["dropped docs", plan.droppedDocs, plan.droppedDocs > 0], ["input cost per call", plan.rejected ? "rejected" : "$" + (((plan.total - plan.tok.reserve) * 3) / 1e6).toFixed(4), plan.rejected]]
     },
   }
 }
@@ -1278,9 +1284,11 @@ function makeRag(stage, ctl) {
     )
   }
   const move = (e) => { const p = localPoint(c.cv, e); Q = { x: clamp((p.x - 20) / (c.w - 40), 0.02, 0.98), y: clamp((p.y - 70) / (c.h - 90), 0.02, 0.98) } }
-  c.cv.addEventListener("pointerdown", (e) => { dragging = true; c.cv.setPointerCapture(e.pointerId); move(e) })
-  c.cv.addEventListener("pointermove", (e) => dragging && move(e))
-  c.cv.addEventListener("pointerup", () => (dragging = false))
+  // dragging holds the pointer that started the drag, so other pointers and a cancelled gesture cannot move Q.
+  c.cv.addEventListener("pointerdown", (e) => { dragging = e.pointerId; c.cv.setPointerCapture(e.pointerId); move(e) })
+  c.cv.addEventListener("pointermove", (e) => dragging === e.pointerId && move(e))
+  c.cv.addEventListener("pointerup", (e) => { if (dragging === e.pointerId) dragging = false })
+  c.cv.addEventListener("lostpointercapture", (e) => { if (dragging === e.pointerId) dragging = false })
   ctl.append(
     slider({ label: "chunk size", min: 128, max: 1024, step: 128, value: chunk, fmt: (v) => v + " tok", onInput: (v) => { chunk = v; build() } }),
     slider({ label: "top k", min: 1, max: 12, step: 1, value: k, onInput: (v) => (k = v) }),
@@ -1385,7 +1393,7 @@ function makeAgent(stage, ctl) {
   center.textContent = "LLM"
   const centerSub = svgEl("text", { x: cx, y: cy + 14, "text-anchor": "middle", "font-size": 9, fill: ink(0.4) }, svg)
   const pulse = svgEl("circle", { r: 5, fill: hot() }, svg)
-  const ol = h("ol")
+  const ol = h("ol", { tabindex: "0", role: "region", "aria-label": "Agent trace" })
   stage.append(h("div", { class: "inst agent" }, svg, h("div", { class: "trace" }, h("span", { class: "cap" }, "trace · newest at the bottom"), ol)))
   ctl.append(
     slider({ label: "step every", min: 400, max: 2400, step: 100, value: speed, fmt: (v) => (v / 1000).toFixed(1) + " s", onInput: (v) => (speed = v) }),
@@ -1393,7 +1401,16 @@ function makeAgent(stage, ctl) {
     btn("inject tool error", () => (injectErr = true)),
   )
   function nextStep() {
-    if (pending.length) { if (pending[0].notBefore && performance.now() < pending[0].notBefore) return null; return pending.shift() }
+    if (pending.length) {
+      if (pending[0].notBefore && performance.now() < pending[0].notBefore) return null
+      const q = pending.shift()
+      // An approved action can fail too. The retry itself (backoff) never takes the injected error.
+      if (q.ph === "act" && !q.backoff && injectErr) {
+        injectErr = false
+        pending.unshift({ ph: "observe", txt: "error 429: too many requests", err: true }, { ph: "reflect", txt: "Transient. Back off 2s and retry once." }, { ph: "act", txt: q.txt + " (retry)", backoff: true })
+      }
+      return q
+    }
     if (idx >= SCRIPT.length) { idx = 0; return { ph: "done", txt: "Run complete. Summary posted to #incidents.", done: true } }
     const s = SCRIPT[idx++]
     if (s.gated && guard) {
@@ -1425,7 +1442,8 @@ function makeAgent(stage, ctl) {
   return {
     frame(t) {
       if (t - last > speed) { const s = nextStep(); if (s) { last = t; push(s) } }
-      gateLink.style.display = nodes.gate.g.style.display = guard ? "" : "none"
+      // An approval already queued still runs, so its gate stays visible until it does.
+      gateLink.style.display = nodes.gate.g.style.display = guard || pending.some((p) => p.ph === "gate") ? "" : "none"
       for (const [k, n] of Object.entries(nodes)) {
         const on = k === to
         n.shape.setAttribute("stroke", on ? hot() : ink(k === "gate" ? 0.5 : 0.4))
@@ -1463,9 +1481,10 @@ function makeEvals(stage, ctl) {
     toggle("prompt cache", false, (v) => (cache = v)))
   let hx = { x0: 0, x1: 0, top: 0, bottom: 0 }
   const setFrom = (e) => { const p = localPoint(c.cv, e); thr = Math.round(clamp(((p.x - hx.x0) / (hx.x1 - hx.x0)) * 100, 40, 100)); thrCtl.set(thr) }
-  c.cv.addEventListener("pointerdown", (e) => { const p = localPoint(c.cv, e); if (p.y > hx.top && p.y < hx.bottom) { dragging = true; c.cv.setPointerCapture(e.pointerId); setFrom(e) } })
-  c.cv.addEventListener("pointermove", (e) => dragging && setFrom(e))
-  c.cv.addEventListener("pointerup", () => (dragging = false))
+  c.cv.addEventListener("pointerdown", (e) => { const p = localPoint(c.cv, e); if (p.y > hx.top && p.y < hx.bottom) { dragging = e.pointerId; c.cv.setPointerCapture(e.pointerId); setFrom(e) } })
+  c.cv.addEventListener("pointermove", (e) => dragging === e.pointerId && setFrom(e))
+  c.cv.addEventListener("pointerup", (e) => { if (dragging === e.pointerId) dragging = false })
+  c.cv.addEventListener("lostpointercapture", (e) => { if (dragging === e.pointerId) dragging = false })
   function tick() {
     const cap = 40, u = Math.min(rps / cap, 0.97)
     const base = cache ? 150 : 330
@@ -1513,7 +1532,7 @@ function makeEvals(stage, ctl) {
       for (let s = 0; s <= 100; s += 20) ctx.fillText(String(s), x0 + (s / 100) * (x1 - x0), y1 + 14)
       const cx = x0 + 6.5 * bw
       ctx.strokeStyle = ink(0.5); ctx.beginPath(); ctx.moveTo(cx, yb(Math.max(h4[5], h4[6])) - 4); ctx.lineTo(cx, y0 + 14); ctx.stroke()
-      ctx.fillStyle = ink(0.75); ctx.textAlign = "left"; ctx.fillText("16 tool-use cases regressed. The average hides them.", cx + 6, y0 + 16)
+      ctx.fillStyle = ink(0.75); ctx.textAlign = "left"; ctx.fillText("Simulated: a cluster of 16 low v4 scores. The average hides them.", cx + 6, y0 + 16)
       const tx = x0 + (thr / 100) * (x1 - x0)
       ctx.strokeStyle = hot(); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx, y0 - 10); ctx.lineTo(tx, y1); ctx.stroke(); ctx.lineWidth = 1
       ctx.fillStyle = hot(); ctx.fillRect(tx - 5, y0 - 16, 10, 7)
@@ -1704,8 +1723,10 @@ function loop(t) {
 }
 document.addEventListener("keydown", (e) => {
   if (e.target.closest("textarea, input, [role=slider]")) return
-  if (e.key === "ArrowRight") go(active + 1)
-  if (e.key === "ArrowLeft") go(active - 1)
+  if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return
+  go(active + (e.key === "ArrowRight" ? 1 : -1))
+  // The focused control may have been removed with the old station, so keep focus on the new one.
+  row.children[active]?.focus()
 })
 window.addEventListener("resize", drawArcs)
 window.addEventListener("hashchange", () => { const i = MODULES.findIndex((m) => "#" + m.id === location.hash); if (i >= 0 && i !== active) go(i, true) })
