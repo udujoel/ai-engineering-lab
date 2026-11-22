@@ -226,7 +226,7 @@ input[type="range"]:active::-moz-range-thumb { background: var(--hot); }
 .agent svg { width: 100%; height: 100%; }
 .agent svg text { font-family: var(--mono); }
 .trace { border-left: 1px solid var(--ink-5); padding: 18px 16px; overflow: hidden; display: flex; flex-direction: column; }
-.trace ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.trace ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .trace li { display: grid; grid-template-columns: 2ch 8ch minmax(0, 1fr); gap: 6px; font-size: 11px; color: var(--ink-2); transition: color 1.2s linear; }
 .trace li .ph { color: var(--ink-3); text-transform: uppercase; font-size: 9px; padding-top: 2px; }
 .trace li.new { color: var(--hot); transition: none; }
@@ -1415,9 +1415,12 @@ function makeAgent(stage, ctl) {
     tokens += 250 + Math.round(R() * 650)
     from = to; to = s.ph; movedAt = performance.now()
     const li = h("li", { class: "new" + (s.err ? " err" : "") + (s.done ? " done" : "") }, h("span", {}, PH[s.ph].g), h("span", { class: "ph" }, s.ph), h("span", {}, s.txt))
+    // Follow the newest step only when the reader is already at the bottom.
+    const atBottom = ol.scrollHeight - ol.scrollTop - ol.clientHeight < 24
     ol.append(li)
     setTimeout(() => li.classList.remove("new"), 60)
     while (ol.children.length > 15) ol.firstChild.remove()
+    if (atBottom) ol.scrollTop = ol.scrollHeight
   }
   return {
     frame(t) {
