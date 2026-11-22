@@ -1443,7 +1443,7 @@ function makeAgent(stage, ctl) {
     frame(t) {
       if (t - last > speed) { const s = nextStep(); if (s) { last = t; push(s) } }
       // An approval already queued still runs, so its gate stays visible until it does.
-      gateLink.style.display = nodes.gate.g.style.display = guard || pending.some((p) => p.ph === "gate") ? "" : "none"
+      gateLink.style.display = nodes.gate.g.style.display = guard || to === "gate" || pending.some((p) => p.ph === "gate") ? "" : "none"
       for (const [k, n] of Object.entries(nodes)) {
         const on = k === to
         n.shape.setAttribute("stroke", on ? hot() : ink(k === "gate" ? 0.5 : 0.4))
