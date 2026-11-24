@@ -51,7 +51,9 @@ def main() -> None:
         "costs": [c.as_dict() for c in costs],
         "portuguese_penalty": penalty,
     }
-    (RESULTS / "step2_token_costs.json").write_text(json.dumps(data, indent=2, ensure_ascii=False))
+    (RESULTS / "step2_token_costs.json").write_text(
+        json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
 
     chart = (
         alt.Chart(df, title="Tokens per character by tokenizer (lower is cheaper)")

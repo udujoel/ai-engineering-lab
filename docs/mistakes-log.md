@@ -183,3 +183,15 @@ Entries 1 to 9 were reconstructed on 2026-11-18 from the session transcripts. Th
 - **How it was caught:** by CodeRabbit and cubic on PR #1, 2026-11-20.
 - **Recovery:** all of these are reworded, and both statements now say what the data supports: the cache can outweigh the weights at a 32k context, and the template cost looks fixed for these three texts.
 - **Lesson:** a finding is only as general as the models and texts behind it. Say which ones.
+
+## 15. Name matching stopped halfway, and a file write relied on the locale
+
+- **Context:** the `same_model()` fix from entry 13 and the JSON export in `scripts/token_costs.py`.
+- **What happened:**
+  - `same_model()` filled in a missing `latest` tag but kept the `library/` namespace. Ollama fills in the `registry.ollama.ai` host and the `library` namespace too, and `ollama ps` prints the short name. So `library/llama3.2` never matched `llama3.2:latest`, and `unload()` would have waited out its timeout.
+  - `write_text()` on the results JSON used the system's default encoding. With `ensure_ascii=False`, the emoji sample would crash the write on a machine whose locale is not UTF-8, such as Windows with cp1252.
+- **Why it was a mistake:** the first fix handled one of Ollama's three defaults instead of all of them, and the write depended on a setting outside the code.
+- **Implications:** none for the recorded results. Du passes short names on a Mac, which uses UTF-8.
+- **How it was caught:** by CodeRabbit on PR #1, 2026-11-24.
+- **Recovery:** `same_model()` now drops the default host and namespace on both sides and still treats a registry port as part of the host. The JSON is written with `encoding="utf-8"`. New tests cover the namespace, the full registry name and a registry port.
+- **Lesson:** when normalizing a name, look up every default the tool applies, not just the one that caused the bug. Always pass an encoding when writing text that is not plain ASCII.
