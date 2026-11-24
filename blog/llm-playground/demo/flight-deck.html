@@ -1,0 +1,1739 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LLM Engineering Flight Deck</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100..800&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: the course as a token sequence on top, lesson text on the left, a live instrument on the right, telemetry tray at the bottom. */
+  /* White ink in five steps on black. Orange only for what is changing right now. */
+  --bg: #060606;
+  --ink: #f3f2ee;
+  --ink-2: rgb(243 242 238 / 0.64);
+  --ink-3: rgb(243 242 238 / 0.52); /* about 5:1 on --bg, enough for small functional text */
+  --ink-4: rgb(243 242 238 / 0.22);
+  --ink-5: rgb(243 242 238 / 0.10);
+  --hot: #ff5a1f;
+  --hot-wash: rgb(255 90 31 / 0.30);
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --fast: 120ms;
+  --fade: 450ms;
+  --pin: 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 12px/1.6 var(--mono);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 1px solid var(--hot); outline-offset: 2px; }
+
+header {
+  display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding-block: 10px; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); border-bottom: 1px solid var(--ink-5);
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3);
+}
+header b { color: var(--ink); font-weight: 700; }
+header .dot { display: inline-block; width: 6px; height: 6px; background: var(--hot); margin-right: 8px; vertical-align: 1px; }
+
+#seq { padding-block: 4px 12px; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); border-bottom: 1px solid var(--ink-5); overflow-x: auto; }
+#seq-inner { position: relative; min-width: 1040px; }
+#seq svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+#seq .cap { height: 58px; font-size: 10px; color: var(--ink-3); padding-top: 4px; }
+#seq-row { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; }
+.mod {
+  position: relative; display: flex; gap: 8px; align-items: baseline; cursor: pointer;
+  padding: 6px 8px 9px; border: 1px solid var(--ink-4); background: none; text-align: left;
+  font-size: 11px; color: var(--ink-2);
+  transition: border-color var(--fast) linear, color var(--fast) linear, background var(--fast) linear;
+}
+.mod .n { font-size: 9px; color: var(--ink-3); }
+.mod:hover { border-color: var(--ink-2); color: var(--ink); }
+.mod[aria-current="true"] { border-color: var(--ink); color: var(--ink); background: var(--ink-5); font-weight: 700; }
+.mod .bar { position: absolute; left: -1px; right: -1px; bottom: -1px; height: 3px; background: var(--ink-5); }
+.mod .bar::after { content: ""; position: absolute; inset: 0 auto 0 0; width: calc(var(--p) * 100%); background: var(--ink); transition: width 300ms linear; }
+
+main { display: grid; grid-template-columns: minmax(300px, 42ch) minmax(0, 1fr); min-height: 0; }
+#lesson { overflow-y: auto; padding: 20px 22px 28px; border-right: 1px solid var(--ink-5); }
+#lesson .num { font-size: 76px; font-weight: 100; line-height: 0.9; letter-spacing: -0.05em; }
+#lesson .kicker { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-3); margin-top: 14px; }
+#lesson h1 { font-size: 21px; line-height: 1.25; font-weight: 750; margin: 4px 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+#lesson p { color: var(--ink-2); margin: 0 0 14px; max-width: 62ch; }
+#lesson .try { border-left: 2px solid var(--hot); padding: 2px 0 2px 10px; color: var(--ink); }
+#lesson h2 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-3); font-weight: 500; margin: 22px 0 8px; display: flex; justify-content: space-between; }
+#lessons { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+#lessons button {
+  width: 100%; display: grid; grid-template-columns: 12px 1fr auto; gap: 10px; align-items: center;
+  background: none; border: 0; padding: 5px 0; cursor: pointer; text-align: left; color: var(--ink-2);
+}
+#lessons button:hover { color: var(--ink); }
+#lessons .box { width: 10px; height: 10px; border: 1px solid var(--ink-3); }
+#lessons [aria-pressed="true"] .box { background: var(--ink); border-color: var(--ink); }
+#lessons [aria-pressed="true"] { color: var(--ink-3); }
+#lessons .min { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--ink-3); }
+#lessons .min i { display: block; height: 1px; background: var(--ink-3); }
+.lab { border: 1px dashed var(--ink-4); padding: 10px 12px; color: var(--ink-2); }
+.lab b { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-3); font-weight: 500; margin-bottom: 4px; }
+
+#deck { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; padding: 16px 20px 12px; gap: 12px; }
+#stage {
+  position: relative; min-height: 0; overflow: hidden;
+  border: 1px solid var(--ink-5);
+  background:
+    linear-gradient(var(--ink-2), var(--ink-2)) top left / 10px 1px no-repeat,
+    linear-gradient(var(--ink-2), var(--ink-2)) top left / 1px 10px no-repeat,
+    linear-gradient(var(--ink-2), var(--ink-2)) top right / 10px 1px no-repeat,
+    linear-gradient(var(--ink-2), var(--ink-2)) top right / 1px 10px no-repeat,
+    linear-gradient(var(--ink-2), var(--ink-2)) bottom left / 10px 1px no-repeat,
+    linear-gradient(var(--ink-2), var(--ink-2)) bottom left / 1px 10px no-repeat,
+    linear-gradient(var(--ink-2), var(--ink-2)) bottom right / 10px 1px no-repeat,
+    linear-gradient(var(--ink-2), var(--ink-2)) bottom right / 1px 10px no-repeat;
+}
+#stage > .inst { position: absolute; inset: 0; animation: pin var(--pin) both; }
+@keyframes pin { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+#stage .tag { position: absolute; top: 8px; right: 14px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-3); pointer-events: none; z-index: 2; }
+#controls { display: flex; flex-wrap: wrap; gap: 14px 26px; align-items: center; min-height: 64px; }
+
+footer {
+  display: flex; gap: 22px; align-items: center; padding-block: 7px; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); border-top: 1px solid var(--ink-5);
+  font-size: 10px; color: var(--ink-3); overflow-x: auto; white-space: nowrap;
+}
+footer b { color: var(--ink); font-weight: 500; }
+footer .hot b { color: var(--hot); }
+footer .hint { margin-left: auto; color: var(--ink-3); }
+
+.ctl { display: flex; align-items: center; gap: 10px; font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
+.ctl output { color: var(--ink); min-width: 6ch; text-transform: none; letter-spacing: 0; }
+input[type="range"] { appearance: none; -webkit-appearance: none; width: 140px; height: 18px; background: transparent; margin: 0; cursor: ew-resize; }
+input[type="range"]::-webkit-slider-runnable-track { height: 1px; background: var(--ink-3); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; margin-top: -4.5px; background: var(--ink); border: 0; border-radius: 0; }
+input[type="range"]:active::-webkit-slider-thumb { background: var(--hot); }
+input[type="range"]::-moz-range-track { height: 1px; background: var(--ink-3); }
+input[type="range"]::-moz-range-thumb { width: 10px; height: 10px; background: var(--ink); border: 0; border-radius: 0; }
+input[type="range"]:active::-moz-range-thumb { background: var(--hot); }
+.btn, .seg button {
+  cursor: pointer; border: 1px solid var(--ink-4); background: none; padding: 4px 9px;
+  font-size: 10px; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.06em;
+  transition: border-color var(--fast) linear, color var(--fast) linear, background var(--fast) linear;
+}
+.btn:hover, .seg button:hover { border-color: var(--ink-2); color: var(--ink); }
+.btn[aria-pressed="true"], .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.seg { gap: 0; }
+.seg .lbl { margin-right: 10px; }
+.seg button + button { border-left: 0; }
+.dial { display: flex; align-items: center; gap: 10px; font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
+.dial svg { width: 58px; height: 58px; cursor: ns-resize; touch-action: none; overflow: visible; }
+.dial output { color: var(--ink); text-transform: none; font-size: 13px; font-weight: 700; }
+.dial .sub { display: block; font-size: 9px; color: var(--ink-3); }
+
+.cv { display: block; width: 100%; height: 100%; touch-action: none; }
+.fill { position: absolute; inset: 0; }
+.cap { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-3); margin-bottom: 6px; }
+
+/* 01 tokens */
+.tok { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 18px; padding: 22px; overflow: auto; }
+.tok textarea {
+  width: 100%; resize: none; background: none; color: var(--ink); border: 0; border-bottom: 1px solid var(--ink-4);
+  font: 14px/1.6 var(--mono); padding: 4px 0 8px; outline: none; min-height: 5.4em;
+}
+.tok textarea:focus { border-bottom-color: var(--hot); }
+.tok-flow { display: flex; flex-wrap: wrap; gap: 5px 3px; align-content: flex-start; }
+.chip {
+  display: inline-flex; flex-direction: column; border: 1px solid var(--ink-4); padding: 3px 6px 2px;
+  font-size: 15px; line-height: 1.25; white-space: pre; color: var(--ink);
+  transition: color var(--fade) linear, border-color var(--fade) linear;
+}
+.chip:nth-of-type(even) { background: var(--ink-5); }
+.chip b { font-weight: 400; }
+.chip i { font-style: normal; font-size: 9px; color: var(--ink-3); }
+.chip .sp { color: var(--ink-4); }
+.chip.new { color: var(--hot); border-color: var(--hot); transition: none; }
+.tok-flow .br { flex-basis: 100%; height: 0; }
+.ids .chip b { display: none; }
+.ids .chip i { font-size: 14px; color: var(--ink); }
+
+/* 03 attention */
+.att { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 8px; padding: 22px; }
+.att-line { display: flex; flex-wrap: wrap; gap: 2px 0.5em; font-size: 22px; line-height: 1.45; }
+.att-line span { padding: 0 3px; cursor: default; transition: font-weight 200ms linear, opacity var(--fast) linear; }
+.att-line span.q { color: var(--hot); box-shadow: inset 0 -2px var(--hot); }
+.att-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, 210px); gap: 18px; min-height: 0; }
+.att-body svg { width: 100%; height: 100%; }
+.att-heat { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.att-heat .note { font-size: 10px; color: var(--ink-3); }
+.att-svg text { font-family: var(--mono); font-size: 13px; cursor: default; }
+.att-svg text:not([fill]) { fill: var(--ink); } /* frame() sets fill on token labels; a blanket rule would override it */
+.att-svg .hd { font-size: 9px; fill: var(--ink-3); letter-spacing: 0.1em; }
+
+/* 04 sampling */
+.samp { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 14px; padding: 22px; }
+.prompt { font-size: 16px; color: var(--ink-2); }
+.prompt .next { color: var(--hot); border-bottom: 1px solid var(--hot); padding: 0 2px; }
+.bars { display: grid; align-content: center; gap: 5px; }
+.bars .row { display: grid; grid-template-columns: 10ch minmax(0, 1fr) 7ch; gap: 12px; align-items: center; font-size: 13px; transition: color var(--fade) linear; }
+.bars .row .p { text-align: right; color: var(--ink-2); font-size: 11px; }
+.bars .track { position: relative; height: 14px; }
+.bars .track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--ink-5); }
+.bars .ghost { position: absolute; left: 0; top: 0; bottom: 0; border: 1px dashed var(--ink-4); border-left: 0; }
+.bars .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink); transition: background var(--fade) linear; }
+.bars .emp { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--hot); opacity: 0.85; }
+.bars .row.cut { color: var(--ink-4); }
+.bars .row.flash { color: var(--hot); transition: none; }
+.bars .row.flash .fill { background: var(--hot); transition: none; }
+.strip { display: flex; gap: 6px; flex-wrap: nowrap; overflow: hidden; font-size: 11px; color: var(--ink-3); white-space: nowrap; min-height: 18px; }
+.strip span:first-child { color: var(--hot); }
+
+/* 05 context */
+.ctx { display: grid; grid-template-rows: minmax(0, 1fr) auto; }
+.ctx .cvwrap { position: relative; min-height: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 10px 22px 16px; font-size: 10px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; display: inline-block; }
+.sw-system { background: var(--ink); }
+.sw-tools { background: rgb(243 242 238 / 0.55); }
+.sw-examples { border: 1px solid var(--ink-3); background: linear-gradient(135deg, transparent 45%, var(--ink) 45% 55%, transparent 55%); }
+.sw-docs { background: radial-gradient(circle, var(--ink) 30%, transparent 32%); }
+.sw-history { border: 1px solid rgb(243 242 238 / 0.7); }
+.sw-user { background: var(--ink); box-shadow: inset 0 0 0 3px var(--bg); outline: 1px solid var(--ink); outline-offset: -1px; }
+.sw-reserve { border: 1px dashed var(--ink-3); }
+.sw-free { background: radial-gradient(circle, var(--ink-4) 20%, transparent 22%); }
+
+/* 06 rag */
+.rag { display: grid; grid-template-columns: minmax(0, 1fr) 250px; }
+.rag .cvwrap { position: relative; min-height: 0; }
+.rag aside { border-left: 1px solid var(--ink-5); padding: 18px 16px; overflow: auto; }
+.rag ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.rag li { display: grid; grid-template-columns: 3ch 6ch minmax(0, 1fr) 2ch; gap: 8px; align-items: center; font-size: 11px; color: var(--ink-2); }
+.rag li .sb { height: 6px; background: var(--ink-5); position: relative; }
+.rag li .sb i { position: absolute; inset: 0 auto 0 0; background: var(--ink-2); }
+.rag li .g { color: var(--ink); }
+.rag li.gold { color: var(--ink); }
+.rag .sum { margin-top: 14px; font-size: 11px; color: var(--ink-2); display: grid; gap: 2px; }
+.rag .sum b { color: var(--ink); font-weight: 600; }
+
+/* 07 agents */
+.agent { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); }
+.agent svg { width: 100%; height: 100%; }
+.agent svg text { font-family: var(--mono); }
+.trace { border-left: 1px solid var(--ink-5); padding: 18px 16px; overflow: hidden; display: flex; flex-direction: column; }
+.trace ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.trace li { display: grid; grid-template-columns: 2ch 8ch minmax(0, 1fr); gap: 6px; font-size: 11px; color: var(--ink-2); transition: color 1.2s linear; }
+.trace li .ph { color: var(--ink-3); text-transform: uppercase; font-size: 9px; padding-top: 2px; }
+.trace li.new { color: var(--hot); transition: none; }
+.trace li.err { color: var(--hot); }
+.trace li.done { color: var(--ink); font-weight: 700; }
+
+@media (prefers-reduced-motion: reduce) {
+  #stage > .inst { animation: none; }
+}
+@media (max-width: 900px) {
+  body { display: block; height: auto; }
+  main { display: block; }
+  #lesson { border-right: 0; border-bottom: 1px solid var(--ink-5); padding-block: 18px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  #deck { padding-block: 14px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  #stage { height: 72vh; min-height: 460px; }
+  header, #seq, footer { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .att-body { grid-template-columns: 1fr; }
+  .att-heat { display: none; }
+  .rag { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+  .rag aside { border-left: 0; border-top: 1px solid var(--ink-5); max-height: 220px; }
+  .agent { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+  .trace { border-left: 0; border-top: 1px solid var(--ink-5); }
+  .ctl { flex-wrap: wrap; max-width: 100%; }
+  .seg { row-gap: 6px; }
+}
+
+/* path: groups and status */
+#seq .groups { display: grid; grid-template-columns: 6fr 4fr; gap: 6px; margin-top: 8px; font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
+#seq .groups span { border-top: 1px solid var(--ink-4); padding-top: 4px; }
+#seq .groups span + span { border-top-style: dashed; }
+.mod .pip { margin-left: auto; font-size: 10px; color: var(--ink-3); }
+.mod.done .pip { color: var(--ink); }
+.mod.now .pip { color: var(--hot); }
+.mod.later { border-style: dashed; }
+
+.status { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 14px; }
+.pill { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; padding: 2px 7px; border: 1px solid var(--ink-4); color: var(--ink-2); }
+.pill.done { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.pill.now { border-color: var(--hot); color: var(--hot); }
+.pill.next { border-style: dashed; color: var(--ink); }
+.pill.sim { border-style: dashed; color: var(--ink-3); }
+.pill.real { border-color: var(--ink-2); color: var(--ink); }
+.facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.facts li { display: grid; grid-template-columns: 9ch minmax(0, 1fr); gap: 10px; color: var(--ink-2); }
+.facts li b { color: var(--ink); font-weight: 700; text-align: right; white-space: nowrap; }
+.run { display: block; margin-top: 8px; padding: 7px 9px; background: var(--ink-5); color: var(--ink); white-space: pre-wrap; word-break: break-word; font-size: 11px; }
+.stage-tag-sim { color: var(--hot) !important; }
+
+/* shared bar rows (DOM charts) */
+.hbars { display: grid; gap: 6px; align-content: start; }
+.hb { display: grid; grid-template-columns: 11ch minmax(0, 1fr) 13ch; gap: 12px; align-items: center; font-size: 12px; color: var(--ink-2); }
+.hb .tr { position: relative; height: 16px; background: linear-gradient(var(--ink-5), var(--ink-5)) 0 50% / 100% 1px no-repeat; }
+.hb .f { position: absolute; left: 0; top: 2px; bottom: 2px; background: var(--ink); transition: width 300ms cubic-bezier(0.16, 1, 0.3, 1); }
+.hb .f2 { position: absolute; top: 2px; bottom: 2px; border: 1px solid var(--ink-2); background: repeating-linear-gradient(135deg, transparent 0 3px, var(--ink-4) 3px 4px); transition: left 300ms, width 300ms; }
+.hb .v { text-align: right; color: var(--ink); font-size: 11px; }
+.hb.best { color: var(--hot); }
+.hb.best .f { background: var(--hot); }
+.hb.best .v { color: var(--hot); }
+.hb .tick { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--ink-3); }
+.sub-ctl { display: contents; }
+
+/* 00 inside */
+.inside { display: grid; grid-template-rows: auto auto minmax(90px, 1fr) auto; gap: 14px; padding: 20px 22px; overflow: auto; }
+.inside .row { display: flex; flex-wrap: wrap; gap: 4px; align-items: stretch; }
+.inside .chip { cursor: default; }
+.inside .chip.last { border-color: var(--hot); }
+.model-box { position: relative; border: 1px solid var(--ink-3); padding: 8px 10px; display: grid; gap: 6px; }
+.model-box .layers { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; height: 16px; }
+.model-box .layers i { background: var(--ink-5); transition: background 160ms linear; }
+.model-box .layers i.on { background: var(--hot); transition: none; }
+.model-box .meta { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 10px; color: var(--ink-3); }
+.model-box .meta b { color: var(--ink); font-weight: 500; }
+.logit-wrap { position: relative; min-height: 90px; }
+.probs .hb { grid-template-columns: 9ch minmax(0, 1fr) 7ch; cursor: default; }
+.probs .hb.rest { color: var(--ink-3); }
+.probs .hb.rest .f { background: none; border: 1px dashed var(--ink-4); }
+
+/* 02 tokens */
+.tz { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 14px; padding: 20px 22px; overflow: auto; }
+.tz .sample { border: 1px solid var(--ink-5); padding: 8px 10px; font-size: 12px; color: var(--ink-2); white-space: pre-wrap; word-break: break-word; max-height: 9.5em; overflow: auto; }
+.tz .note { font-size: 11px; color: var(--ink-2); border-left: 2px solid var(--hot); padding-left: 10px; max-width: 70ch; }
+.tz .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; align-content: start; }
+.splits { border-collapse: collapse; font-size: 12px; width: 100%; }
+.splits th { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-3); font-weight: 500; text-align: left; padding: 4px 8px 6px 0; }
+.splits td { padding: 5px 8px 5px 0; border-top: 1px solid var(--ink-5); vertical-align: top; }
+.splits td:first-child { color: var(--ink-2); white-space: nowrap; }
+.pc { display: inline-block; border: 1px solid var(--ink-4); padding: 0 4px; margin: 1px 2px 1px 0; white-space: pre; }
+.pc.whole { border-color: var(--ink); color: var(--ink); font-weight: 700; }
+.tblwrap { overflow-x: auto; }
+
+/* 01 models */
+.models { display: grid; grid-template-rows: minmax(0, 1fr); }
+.models .cvwrap { position: relative; min-height: 0; }
+.kv { padding: 22px; display: grid; gap: 16px; align-content: start; overflow: auto; }
+.kv .hb { grid-template-columns: 14ch minmax(0, 1fr) 15ch; }
+.kv .f { background: var(--ink-2); }
+.kv .legend2 { display: flex; gap: 16px; flex-wrap: wrap; font-size: 10px; color: var(--ink-3); }
+.kv .legend2 i { display: inline-block; width: 10px; height: 10px; vertical-align: -1px; margin-right: 6px; }
+
+@media (max-width: 900px) {
+  .tz .grid2 { grid-template-columns: 1fr; }
+  .hb { grid-template-columns: 9ch minmax(0, 1fr) 11ch; }
+  .kv .hb { grid-template-columns: 11ch minmax(0, 1fr) 12ch; }
+}
+</style>
+<header>
+  <span><span class="dot"></span><b>AI Engineering</b> · flight deck · project 1, llm playground · numbers from my M2 Pro</span>
+  <span id="progress-readout"></span>
+</header>
+
+<section id="seq" aria-label="Learning path">
+  <div id="seq-inner">
+    <div class="cap">The learning path. Arcs show what each module builds on, drawn like attention weights. Solid modules use my measured data.</div>
+    <div id="seq-row"></div>
+    <div class="groups"><span>Project 1 · built and measured</span><span>Ahead · previews for projects 2 to 4</span></div>
+    <svg id="seq-arcs" aria-hidden="true"></svg>
+  </div>
+</section>
+
+<main>
+  <article id="lesson" aria-live="polite"></article>
+  <section id="deck" aria-label="Live instrument">
+    <div id="stage"></div>
+    <div id="controls"></div>
+  </section>
+</main>
+
+<footer id="tray"></footer>
+
+<script>
+const NS = "http://www.w3.org/2000/svg"
+const FONT = '"JetBrains Mono", ui-monospace, Menlo, monospace'
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches
+const INK = "243,242,238"
+const HOT = "255,90,31"
+const ink = (a) => `rgba(${INK},${a})`
+const hot = (a = 1) => `rgba(${HOT},${a})`
+
+const $ = (s, r = document) => r.querySelector(s)
+function h(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag)
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") e.className = v
+    else if (k === "style") e.style.cssText = v
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v)
+    else e.setAttribute(k, v)
+  }
+  for (const kid of kids.flat()) if (kid != null) e.append(kid)
+  return e
+}
+function svgEl(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag)
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v)
+  parent?.append(e)
+  return e
+}
+function rng(seed) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v))
+const lerp = (a, b, t) => a + (b - a) * t
+function gauss(R) { return Math.sqrt(-2 * Math.log(R() || 1e-9)) * Math.cos(2 * Math.PI * R()) }
+
+function makeCanvas(parent) {
+  const cv = h("canvas", { class: "cv" })
+  parent.append(cv)
+  const ctx = cv.getContext("2d")
+  const s = { cv, ctx, w: 0, h: 0 }
+  const fit = () => {
+    const r = cv.getBoundingClientRect()
+    const d = devicePixelRatio || 1
+    s.w = r.width
+    s.h = r.height
+    cv.width = Math.max(1, Math.round(r.width * d))
+    cv.height = Math.max(1, Math.round(r.height * d))
+    ctx.setTransform(d, 0, 0, d, 0, 0)
+  }
+  const ro = new ResizeObserver(fit)
+  ro.observe(cv)
+  fit()
+  s.dispose = () => ro.disconnect()
+  return s
+}
+function localPoint(cv, e) {
+  const r = cv.getBoundingClientRect()
+  return { x: e.clientX - r.left, y: e.clientY - r.top }
+}
+
+let uid = 0
+function slider({ label, min, max, step, value, fmt = (v) => v, onInput }) {
+  const id = `ctl-${++uid}`
+  const out = h("output", { for: id }, fmt(value))
+  const input = h("input", { type: "range", id, min, max, step, value })
+  input.addEventListener("input", () => {
+    out.textContent = fmt(+input.value)
+    onInput(+input.value)
+  })
+  const el = h("div", { class: "ctl" }, h("label", { for: id }, label), input, out)
+  el.set = (v) => { input.value = v; out.textContent = fmt(v) }
+  return el
+}
+function seg({ label, options, value, onChange }) {
+  const wrap = h("div", { class: "ctl seg", role: "group", "aria-label": label }, h("span", { class: "lbl" }, label))
+  for (const o of options) {
+    const b = h("button", { type: "button", "aria-pressed": String(o === value) }, o)
+    b.onclick = () => {
+      wrap.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", "false"))
+      b.setAttribute("aria-pressed", "true")
+      onChange(o)
+    }
+    wrap.append(b)
+  }
+  return wrap
+}
+const btn = (label, onClick) => h("button", { type: "button", class: "btn", onclick: onClick }, label)
+function toggle(label, value, onChange) {
+  const b = h("button", { type: "button", class: "btn", "aria-pressed": String(value) }, label)
+  b.onclick = () => { value = !value; b.setAttribute("aria-pressed", String(value)); onChange(value) }
+  return b
+}
+function polar(cx, cy, r, deg) {
+  const a = (deg * Math.PI) / 180
+  return [cx + r * Math.sin(a), cy - r * Math.cos(a)]
+}
+function arc(cx, cy, r, a0, a1) {
+  const [x0, y0] = polar(cx, cy, r, a0)
+  const [x1, y1] = polar(cx, cy, r, a1)
+  return `M${x0},${y0}A${r},${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1},${y1}`
+}
+function dial({ label, sub, min, max, value, fmt, onInput }) {
+  const id = `ctl-${++uid}`
+  const svg = svgEl("svg", { viewBox: "0 0 58 58", tabindex: "0", role: "slider", id, "aria-label": label, "aria-valuemin": min, "aria-valuemax": max })
+  for (let i = 0; i <= 20; i++) {
+    const a = -135 + i * 13.5
+    const [x0, y0] = polar(29, 29, 26, a)
+    const [x1, y1] = polar(29, 29, i % 5 ? 24 : 22, a)
+    svgEl("line", { x1: x0, y1: y0, x2: x1, y2: y1, stroke: ink(i % 5 ? 0.22 : 0.5), "stroke-width": 1 }, svg)
+  }
+  svgEl("path", { d: arc(29, 29, 17, -135, 135), stroke: ink(0.1), "stroke-width": 3, fill: "none" }, svg)
+  const fillArc = svgEl("path", { stroke: ink(1), "stroke-width": 3, fill: "none" }, svg)
+  const needle = svgEl("line", { stroke: ink(1), "stroke-width": 1.5 }, svg)
+  svgEl("circle", { cx: 29, cy: 29, r: 2, fill: ink(1) }, svg)
+  const out = h("output", { for: id })
+  const el = h("div", { class: "dial" }, svg, h("div", {}, h("label", { for: id }, label), h("br"), out, sub ? h("span", { class: "sub" }, sub) : null))
+  const render = (active) => {
+    const t = (value - min) / (max - min)
+    const a = -135 + t * 270
+    fillArc.setAttribute("d", t > 0.002 ? arc(29, 29, 17, -135, a) : "")
+    const [x, y] = polar(29, 29, 15, a)
+    needle.setAttribute("x1", 29); needle.setAttribute("y1", 29); needle.setAttribute("x2", x); needle.setAttribute("y2", y)
+    const c = active ? hot() : ink(1)
+    fillArc.setAttribute("stroke", c); needle.setAttribute("stroke", c)
+    out.textContent = fmt(value)
+    svg.setAttribute("aria-valuenow", value.toFixed(2))
+  }
+  const set = (v, active) => { value = clamp(v, min, max); render(active); onInput(value) }
+  let start = null
+  svg.addEventListener("pointerdown", (e) => { svg.setPointerCapture(e.pointerId); start = { y: e.clientY, v: value }; render(true) })
+  svg.addEventListener("pointermove", (e) => { if (start) set(start.v + ((start.y - e.clientY) / 160) * (max - min), true) })
+  const end = () => { start = null; render(false) }
+  svg.addEventListener("pointerup", end)
+  svg.addEventListener("pointercancel", end)
+  svg.addEventListener("wheel", (e) => { e.preventDefault(); set(value - Math.sign(e.deltaY) * (max - min) / 50, false) }, { passive: false })
+  svg.addEventListener("keydown", (e) => {
+    const d = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key]
+    if (d) { e.preventDefault(); e.stopPropagation(); set(value + (d * (max - min)) / 40, false) }
+  })
+  render(false)
+  return el
+}
+function graticule(ctx, w, hgt, step = 40) {
+  ctx.strokeStyle = ink(0.05)
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  for (let x = step; x < w; x += step) { ctx.moveTo(Math.round(x) + 0.5, 0); ctx.lineTo(Math.round(x) + 0.5, hgt) }
+  for (let y = step; y < hgt; y += step) { ctx.moveTo(0, Math.round(y) + 0.5); ctx.lineTo(w, Math.round(y) + 0.5) }
+  ctx.stroke()
+}
+function arrow(ctx, x0, y0, x1, y1, color, width = 1.5) {
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke()
+  const a = Math.atan2(y1 - y0, x1 - x0)
+  ctx.beginPath(); ctx.moveTo(x1, y1)
+  ctx.lineTo(x1 - 8 * Math.cos(a - 0.4), y1 - 8 * Math.sin(a - 0.4))
+  ctx.lineTo(x1 - 8 * Math.cos(a + 0.4), y1 - 8 * Math.sin(a + 0.4))
+  ctx.closePath(); ctx.fill()
+}
+
+
+/* ---------- measured data, copied from 01-llm-playground/LAB_NOTES.md and results/ ---------- */
+const STEP0 = {
+  tokens: [["The", 785], [" capital", 6722], [" of", 315], [" France", 9625], [" is", 374]],
+  top: [[" Paris", 12095, 0.316], [" ______", 32671, 0.115], [" ____", 30743, 0.064], [" __", 1304, 0.055], [":\n", 510, 0.051]],
+  vocab: 151936, layers: 24, msSynced: 212, msFirst: 774, loadWarm: 4.9, loadFirst: 31.3,
+}
+const MODELS = [
+  { id: "llama3.2:3b", name: "llama3.2", gbTok: 2.0, cold: 2.85, prefill: 751, decode: 66.3, partB: 76, layers: 28, kvh: 8, hd: 128, bare: 11, tmpl: 24 },
+  { id: "qwen3:4b", name: "qwen3", gbTok: 2.5, cold: 2.42, prefill: 563, decode: 53.8, partB: 1145, layers: 36, kvh: 8, hd: 128, bare: 10, tmpl: 10 },
+  { id: "gemma3:4b", name: "gemma3", gbTok: 2.5, cold: 2.47, prefill: 637, decode: 53.9, partB: 56, layers: 34, kvh: 4, hd: 256, swa: { full: 5, win: 1536 }, bare: 10, tmpl: 9 },
+  { id: "deepseek-r1:7b", name: "deepseek-r1", gbTok: 4.7, cold: 3.51, prefill: 343, decode: 33.4, partB: 601, layers: 28, kvh: 4, hd: 128, bare: 11, tmpl: 2 },
+]
+const TOKENIZERS = ["gpt2", "qwen2.5", "smollm2", "phi-4-mini", "gpt-4", "gpt-4o"]
+const SAMPLE_TEXT = {
+  english: "The harbour town woke slowly. Fishing boats left before dawn, and the bakery on the corner opened its shutters as the first light reached the hills. By mid morning the market was full of voices, crates of fish and the smell of coffee drifting from the cafe by the water.",
+  portuguese: "A vila do porto acordou devagar. Os barcos de pesca saíram antes do amanhecer, e a padaria da esquina abriu as portadas quando a primeira luz chegou às colinas. A meio da manhã o mercado estava cheio de vozes, caixas de peixe e o cheiro a café que vinha do café junto à água.",
+  python: 'def tokens_per_second(count: int, duration_ns: int) -> float:\n    """Tokens divided by seconds. Returns 0.0 when nothing was timed."""\n    if not count or not duration_ns:\n        return 0.0\n    return count / (duration_ns / 1_000_000_000)\n',
+  json: '{"model": "qwen3:4b", "created_at": "2026-11-19T22:37:05Z", "done": true, "prompt_eval_count": 24, "eval_count": 1, "options": {"temperature": 0, "seed": 0}}',
+  numbers: "Order 1234567 shipped on 2026-11-20 at 14:05 for $1,299.99, a 12.5% discount.",
+  emoji: "Great job 👍🏽 see you soon 🙂 🇵🇹 ❤️",
+}
+const CHARS = { english: 270, portuguese: 275, python: 240, json: 157, numbers: 77, emoji: 33 }
+const COUNTS = {
+  gpt2: [56, 104, 86, 67, 31, 20],
+  "qwen2.5": [56, 85, 72, 73, 49, 15],
+  smollm2: [58, 104, 79, 77, 49, 22],
+  "phi-4-mini": [55, 68, 66, 65, 35, 14],
+  "gpt-4": [56, 88, 66, 65, 35, 19],
+  "gpt-4o": [55, 68, 66, 65, 35, 14],
+}
+const SAMPLE_NOTE = {
+  english: "Everyone lands at about 0.2 tokens per character, five characters per token. Every tokenizer was trained mostly on English, so this is the baseline.",
+  portuguese: "Same meaning as the English paragraph. GPT-2 needs 104 tokens, GPT-4o and Phi-4 mini 68. The 200k vocabularies hold whole Portuguese words.",
+  python: "GPT-2 has no tokens for runs of spaces, so every indent costs it several tokens. The GPT-4 family and Phi-4 mini tie at 66.",
+  json: "Expensive for everyone: quotes, colons, braces and keys like prompt_eval_count break into many short pieces.",
+  numbers: "The ranking flips. GPT-2 is cheapest because it glues digits together; Qwen2.5 and SmolLM2 split every digit, which costs tokens but helps arithmetic.",
+  emoji: "The worst per character. A skin tone emoji, a flag and a heart are several code points each. SmolLM2 spends 22 tokens on 33 characters.",
+}
+const CAT_SPLITS = [
+  ["gpt2 · smollm2", [["g", "ato"], ["so", "f", "á"], ["l", "á"]]],
+  ["qwen2.5 · gpt-4", [["g", "ato"], ["sof", "á"], ["lá"]]],
+  ["phi-4-mini · gpt-4o", [["gato"], ["sofá"], ["lá"]]],
+]
+const NUM_SPLITS = [
+  ["gpt2", ["·123", "45", "67"], "whatever chunks were common in its training text"],
+  ["qwen2.5 · smollm2", ["1", "2", "3", "4", "5", "6", "7"], "one token per digit"],
+  ["phi-4-mini · gpt-4 · gpt-4o", ["123", "456", "7"], "groups of three from the left"],
+]
+
+function hbar({ label, value, max, text, best, ticks = [] }) {
+  const f = h("span", { class: "f", style: `width:${clamp((value / max) * 100, 0, 100).toFixed(2)}%` })
+  const tr = h("span", { class: "tr" }, f, ...ticks.map((t) => h("span", { class: "tick", style: `left:${((t / max) * 100).toFixed(2)}%` })))
+  return h("div", { class: "hb" + (best ? " best" : "") }, h("span", {}, label), tr, h("span", { class: "v" }, text ?? String(value)))
+}
+function swapView(ctl, views, start, onSwap) {
+  const sub = h("div", { class: "sub-ctl" })
+  ctl.append(seg({ label: "view", options: Object.keys(views), value: start, onChange: (v) => onSwap(v, sub) }), sub)
+  return sub
+}
+
+/* ---------- 00 inside a model (Step 0, measured) ---------- */
+function makeInside(stage, ctl) {
+  let first = false, runAt = -1e9, hover = -1
+  const chips = STEP0.tokens.map(([t, id], i) => h("span", { class: "chip" + (i === 4 ? " last" : ""), title: `position ${i}, id ${id}` }, h("b", {}, t.startsWith(" ") ? [h("span", { class: "sp" }, "·"), t.slice(1)] : t), h("i", {}, String(id))))
+  const layers = Array.from({ length: STEP0.layers }, () => h("i"))
+  const msOut = h("b", {}, STEP0.msSynced + " ms")
+  const box = h("div", { class: "model-box" },
+    h("div", { class: "meta" }, h("span", {}, h("b", {}, "Qwen2.5 0.5B"), " base model · 24 layers · mps"), h("span", {}, "forward pass ", msOut)),
+    h("div", { class: "layers" }, ...layers))
+  const lw = h("div", { class: "logit-wrap" })
+  const rest = 1 - STEP0.top.reduce((a, [, , p]) => a + p, 0)
+  const probRows = STEP0.top.map(([t, id, p], i) => {
+    const r = hbar({ label: JSON.stringify(t).slice(1, -1).replace(/^ /, "·"), value: p, max: 0.4, text: (p * 100).toFixed(1) + "%", best: i === 0 })
+    r.title = `token id ${id}`
+    r.addEventListener("pointerenter", () => (hover = i)); r.addEventListener("pointerleave", () => (hover = -1))
+    return r
+  })
+  const restRow = hbar({ label: "the rest", value: rest, max: 0.4, text: (rest * 100).toFixed(1) + "%" })
+  restRow.classList.add("rest")
+  stage.append(h("div", { class: "inst inside" },
+    h("div", {}, h("span", { class: "cap" }, "prompt → tokens and ids (what the model receives)"), h("div", { class: "row" }, ...chips)),
+    box,
+    h("div", { style: "display:grid;grid-template-rows:auto minmax(0,1fr)" }, h("span", { class: "cap" }, "logits · shape (1, 5, 151936) · one row per position, one score per vocabulary slot"), lw),
+    h("div", {}, h("span", { class: "cap" }, "softmax of the last row · top 5 of 151,936"), h("div", { class: "hbars probs" }, ...probRows, restRow))))
+  const c = makeCanvas(lw)
+  ctl.append(
+    btn("run forward pass", () => (runAt = performance.now())),
+    toggle("first run timing", false, (v) => { first = v; msOut.textContent = (v ? STEP0.msFirst : STEP0.msSynced) + " ms" }),
+  )
+  setTimeout(() => (runAt = performance.now()), 300)
+  const R = rng(11)
+  const noise = Array.from({ length: 5 }, () => Array.from({ length: 600 }, () => R()))
+  return {
+    dispose: c.dispose,
+    frame() {
+      const ms = first ? STEP0.msFirst : STEP0.msSynced
+      const slow = 6 // play the pass 6x slower than real time so it can be seen
+      const p = (performance.now() - runAt) / (ms * slow)
+      layers.forEach((l, i) => l.classList.toggle("on", p >= 0 && p < 1 && Math.floor(p * STEP0.layers) === i))
+      const { ctx, w, h: H } = c
+      ctx.clearRect(0, 0, w, H)
+      const rows = 5, rh = Math.max(10, (H - 18) / rows), lit = p >= 1 || p < 0 ? 1 : 0
+      for (let r = 0; r < rows; r++) {
+        const y = r * rh, mid = y + rh / 2
+        ctx.fillStyle = ink(0.4); ctx.font = `400 9px ${FONT}`; ctx.textAlign = "left"
+        ctx.fillText(String(r), 0, mid + 3)
+        const x0 = 14, ww = w - x0
+        ctx.fillStyle = ink(r === 4 ? 0.22 : 0.1)
+        for (let k = 0; k < 600; k++) { const hh = noise[r][k] * rh * 0.28; ctx.fillRect(x0 + (k / 600) * ww, mid - hh / 2, Math.max(1, ww / 600 - 0.5), hh) }
+        if (r === 4 && lit) {
+          STEP0.top.forEach(([t, id, pr], i) => {
+            const x = x0 + (id / STEP0.vocab) * ww, hh = rh * (0.3 + 0.7 * (pr / 0.316))
+            ctx.fillStyle = i === 0 || i === hover ? hot() : ink(0.9)
+            ctx.fillRect(x - 1, mid + rh * 0.45 - hh, 2.5, hh)
+            if (i === 0 || i === hover) { ctx.textAlign = x > w - 90 ? "right" : "left"; ctx.fillText(`${JSON.stringify(t).slice(1, -1)} · id ${id}`, x + (x > w - 90 ? -6 : 6), mid - rh * 0.25) }
+          })
+        }
+      }
+      ctx.fillStyle = ink(0.35); ctx.textAlign = "left"; ctx.fillText("id 0", 14, H - 3)
+      ctx.textAlign = "right"; ctx.fillText("id 151,935", w, H - 3)
+      ctx.textAlign = "center"; ctx.fillText("spikes on row 4 are the measured top 5; the grey texture is illustration", w / 2, H - 3)
+    },
+    telemetry() {
+      return [["forward pass", (first ? STEP0.msFirst : STEP0.msSynced) + " ms", true], ["load", first ? "31.3 s (with download)" : "4.9 s (cached)"], ["prompt tokens", 5], ["vocabulary slots", "151,936"], ["top guess", "Paris 31.6%"]]
+    },
+  }
+}
+
+/* ---------- 01 local models (Step 1, measured) ---------- */
+function kvGiB(m, ctx) {
+  const per = 2 * m.kvh * m.hd * 2 // keys and values, fp16 bytes, per layer per position
+  const bytes = m.swa ? per * (m.swa.full * ctx + (m.layers - m.swa.full) * Math.min(ctx, m.swa.win)) : per * m.layers * ctx
+  return bytes / 2 ** 30
+}
+function makeModels(stage, ctl) {
+  let view = "race", prompt = 1500, reply = 200, cold = true, partB = false, t0 = performance.now(), bw = 200, ctxIdx = 6, hoverM = -1
+  const CTX = [512, 1024, 2048, 4096, 8192, 16384, 32768]
+  const wrap = h("div", { class: "inst models" })
+  stage.append(wrap)
+  let c = null, kvBox = null
+  const lanes = () => MODELS.map((m) => {
+    const load = cold ? m.cold : 0.001, pre = prompt / m.prefill, rep = partB ? m.partB : reply, dec = rep / m.decode
+    return { m, load, pre, dec, rep, total: load + pre + dec }
+  })
+  const restart = () => (t0 = performance.now())
+  function build(v, sub) {
+    view = v
+    c?.dispose?.(); c = null; kvBox = null
+    wrap.replaceChildren(h("span", { class: "tag" }, "measured · M2 Pro · Ollama · Step 1"))
+    sub.replaceChildren()
+    if (v === "race") {
+      const cw = h("div", { class: "cvwrap" }); wrap.append(cw); c = makeCanvas(cw)
+      sub.append(
+        slider({ label: "prompt", min: 20, max: 8000, step: 20, value: prompt, fmt: (x) => x + " tok", onInput: (x) => { prompt = x; restart() } }),
+        slider({ label: "reply", min: 10, max: 1200, step: 10, value: reply, fmt: (x) => x + " tok", onInput: (x) => { reply = x; restart() } }),
+        toggle("cold start", cold, (x) => { cold = x; restart() }),
+        toggle("Part B reply lengths", partB, (x) => { partB = x; restart() }),
+        btn("race again", restart))
+    } else if (v === "bandwidth") {
+      const cw = h("div", { class: "cvwrap" }); wrap.append(cw); c = makeCanvas(cw)
+      const s = slider({ label: "memory bandwidth", min: 100, max: 1100, step: 1, value: bw, fmt: (x) => x + " GB/s", onInput: (x) => { bw = x; syncChip() } })
+      const CHIPS = ["M2 Pro 200", "M4 Max 546", "RTX 4090 1008"]
+      const presets = seg({ label: "chip", options: CHIPS, value: null, onChange: (o) => { bw = parseInt(o.split(" ").pop()); s.set(bw) } })
+      // The pressed chip always follows bw, and none is pressed when bw matches no preset.
+      const syncChip = () => presets.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(parseInt(b.textContent.split(" ").pop()) === bw)))
+      syncChip()
+      sub.append(s, presets)
+    } else {
+      kvBox = h("div", { class: "kv" }); wrap.append(kvBox)
+      sub.append(slider({ label: "context", min: 0, max: 6, step: 1, value: ctxIdx, fmt: (i) => CTX[i].toLocaleString("en") + " tok", onInput: (i) => { ctxIdx = i; drawKV() } }))
+      drawKV()
+    }
+  }
+  function drawKV() {
+    const ctx = CTX[ctxIdx], max = 8
+    const rows = MODELS.map((m) => {
+      const kv = kvGiB(m, ctx), wt = (m.gbTok * 1e9) / 2 ** 30
+      const r = hbar({ label: m.name, value: wt, max, text: `${wt.toFixed(1)} + ${kv < 0.1 ? kv.toFixed(2) : kv.toFixed(1)} GiB` })
+      const tr = r.querySelector(".tr")
+      tr.append(h("span", { class: "f2", style: `left:${((wt / max) * 100).toFixed(2)}%;width:${((kv / max) * 100).toFixed(2)}%` }))
+      return r
+    })
+    kvBox.replaceChildren(
+      h("span", { class: "cap" }, `memory for weights plus KV cache at ${ctx.toLocaleString("en")} tokens of context`),
+      h("div", { class: "legend2" }, h("span", {}, h("i", { style: "background:var(--ink-2)" }), "weights read per token"), h("span", {}, h("i", { style: "border:1px solid var(--ink-2);background:repeating-linear-gradient(135deg,transparent 0 3px,var(--ink-4) 3px 4px)" }), "KV cache, reserved up front")),
+      h("div", { class: "hbars" }, ...rows),
+      h("p", { class: "lab" }, h("b", {}, "formula"), "2 (keys and values) × layers × KV heads × head dimension × 2 bytes × positions. Qwen3 has 36 layers × 8 KV heads, DeepSeek 28 × 4, so the smaller model carries 2.6 times the cache. Gemma keeps the full context in only 5 of its 34 layers; the other 29 use a 1,024 token sliding window (1,536 positions cached). At 32,768 tokens these match the Ollama server log: 3.5, 4.5, 0.8 and 1.75 GiB."),
+    )
+  }
+  const sub = swapView(ctl, { race: 1, bandwidth: 1, "kv cache": 1 }, "race", build)
+  build("race", sub)
+  function drawRace() {
+    const { ctx, w, h: H } = c
+    ctx.clearRect(0, 0, w, H)
+    const L = lanes(), maxT = Math.max(...L.map((l) => l.total))
+    const play = Math.max(1, maxT / 7)
+    const el = ((performance.now() - t0) / 1000) * play
+    const x0 = 120, x1 = w - 90, top = 46, lh = Math.min(64, (H - top - 50) / 4)
+    const X = (s) => x0 + (s / maxT) * (x1 - x0)
+    ctx.font = `500 9px ${FONT}`; ctx.fillStyle = ink(0.4); ctx.textAlign = "left"
+    ctx.fillText(`TIME TO ANSWER = LOAD + PROMPT ÷ PREFILL + REPLY ÷ DECODE · PLAYING AT ${play.toFixed(1)}× REAL TIME`, 20, 20)
+    const step = [0.5, 1, 2, 5, 10, 20, 30, 60].find((s) => maxT / s <= 8) || 60
+    ctx.strokeStyle = ink(0.07); ctx.textAlign = "center"
+    for (let s = 0; s <= maxT + 1e-9; s += step) { const x = Math.round(X(s)) + 0.5; ctx.beginPath(); ctx.moveTo(x, top - 8); ctx.lineTo(x, top + lh * 4); ctx.stroke(); ctx.fillText(s + " s", x, top + lh * 4 + 14) }
+    const finished = L.filter((l) => el >= l.total).sort((a, b) => a.total - b.total)
+    L.forEach((l, i) => {
+      const y = top + i * lh, bh = Math.min(18, lh * 0.36), by = y + lh / 2 - bh / 2
+      ctx.textAlign = "left"; ctx.font = `600 12px ${FONT}`; ctx.fillStyle = ink(0.95); ctx.fillText(l.m.name, 20, by + bh / 2 + 1)
+      ctx.font = `400 9px ${FONT}`; ctx.fillStyle = ink(0.4); ctx.fillText(`${l.m.prefill} / ${l.m.decode} tok/s`, 20, by + bh / 2 + 13)
+      ctx.strokeStyle = ink(0.12); ctx.strokeRect(X(0) + 0.5, by + 0.5, X(l.total) - X(0), bh - 1)
+      const segs = [["load", l.load, "hatch"], ["prefill", l.pre, 0.45], ["decode", l.dec, 0.95]]
+      let acc = 0
+      for (const [name, d, a] of segs) {
+        const s0 = acc, s1 = acc + d; acc = s1
+        const shown = clamp(el, s0, s1)
+        if (shown <= s0) continue
+        const xa = X(s0), xb = X(shown)
+        if (a === "hatch") {
+          ctx.save(); ctx.beginPath(); ctx.rect(xa, by, xb - xa, bh); ctx.clip(); ctx.strokeStyle = ink(0.4)
+          for (let k = xa - bh; k < xb; k += 5) { ctx.beginPath(); ctx.moveTo(k, by + bh); ctx.lineTo(k + bh, by); ctx.stroke() }
+          ctx.restore()
+        } else { ctx.fillStyle = ink(a); ctx.fillRect(xa, by, xb - xa, bh) }
+      }
+      const done = el >= l.total
+      if (!done) { ctx.fillStyle = hot(); ctx.fillRect(X(Math.min(el, l.total)) - 1, by - 4, 2, bh + 8) }
+      ctx.textAlign = "left"; ctx.font = `700 11px ${FONT}`
+      ctx.fillStyle = done && finished[0] === l ? hot() : ink(done ? 0.95 : 0.4)
+      ctx.fillText(done ? l.total.toFixed(1) + " s" : (Math.min(el, l.total)).toFixed(1) + " s", X(l.total) + 8, by + bh / 2 + 4)
+      if (partB) { ctx.font = `400 9px ${FONT}`; ctx.fillStyle = ink(0.4); ctx.fillText(l.rep.toLocaleString("en") + " reply tok", X(l.total) + 8, by + bh / 2 + 16) }
+    })
+    ctx.textAlign = "left"; ctx.font = `400 9px ${FONT}`; ctx.fillStyle = ink(0.45)
+    ctx.fillText("▨ load    ▬ prefill (prompt)    █ decode (reply)", 20, H - 10)
+  }
+  function drawBandwidth() {
+    const { ctx, w, h: H } = c
+    ctx.clearRect(0, 0, w, H)
+    const x0 = 56, x1 = w - 30, y0 = 40, y1 = H - 44
+    const eff = MODELS.map((m) => (m.gbTok * m.decode) / 200)
+    const yMax = Math.max(100, Math.ceil(((bw * 0.9) / 1.6) / 50) * 50)
+    const X = (gb) => x0 + (gb / 5) * (x1 - x0), Y = (t) => y1 - (t / yMax) * (y1 - y0)
+    ctx.font = `500 9px ${FONT}`; ctx.fillStyle = ink(0.4); ctx.textAlign = "left"
+    ctx.fillText("DECODE SPEED VS GIGABYTES READ PER TOKEN · EVERY NEW TOKEN READS ALL THE WEIGHTS", 20, 20)
+    ctx.strokeStyle = ink(0.08); ctx.textAlign = "right"
+    for (let t = 0; t <= yMax; t += yMax / 5) { const y = Math.round(Y(t)) + 0.5; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.fillText(Math.round(t) + "", x0 - 8, y + 3) }
+    ctx.textAlign = "center"
+    for (let g = 0; g <= 5; g++) ctx.fillText(g + " GB", X(g), y1 + 16)
+    ctx.fillText("tok/s", x0 - 30, y0 - 12)
+    const curve = (B, color, dash) => {
+      ctx.strokeStyle = color; ctx.setLineDash(dash); ctx.beginPath()
+      for (let g = 0.4; g <= 5; g += 0.05) { const y = Y(Math.min(yMax * 1.2, B / g)); g === 0.4 ? ctx.moveTo(X(g), y) : ctx.lineTo(X(g), y) }
+      ctx.stroke(); ctx.setLineDash([])
+    }
+    ctx.save(); ctx.beginPath(); ctx.rect(x0, y0 - 10, x1 - x0, y1 - y0 + 10); ctx.clip()
+    curve(200, ink(0.35), [3, 3])
+    if (bw !== 200) curve(bw, hot(0.8), [4, 3])
+    ctx.restore()
+    ctx.textAlign = "left"; ctx.fillStyle = ink(0.5); ctx.fillText("ceiling at 200 GB/s (M2 Pro)", X(4.0), Y(200 / 4.0) - 8)
+    if (bw !== 200) { ctx.fillStyle = hot(); ctx.fillText(`ceiling at ${bw} GB/s`, X(Math.max(1.2, bw / (yMax * 0.85))) + 8, Y(Math.min(yMax * 0.85, bw / Math.max(1.2, bw / (yMax * 0.85)))) - 6) }
+    MODELS.forEach((m, i) => {
+      const x = X(m.gbTok), y = Y(m.decode), dy = m.name === "gemma3" ? 16 : -10
+      ctx.fillStyle = ink(1); ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill()
+      ctx.font = `600 11px ${FONT}`; ctx.textAlign = "left"; ctx.fillText(`${m.name} ${m.decode}`, x + 8, y + dy)
+      if (bw !== 200) {
+        const py = Y(Math.min(yMax, (bw * eff[i]) / m.gbTok))
+        ctx.strokeStyle = hot(); ctx.beginPath(); ctx.arc(x, py, 5, 0, Math.PI * 2); ctx.stroke()
+        ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(x, y - 5); ctx.lineTo(x, py + 6); ctx.stroke(); ctx.setLineDash([])
+        ctx.fillStyle = hot(); ctx.font = `400 10px ${FONT}`; ctx.fillText(`≈ ${Math.round((bw * eff[i]) / m.gbTok)}`, x + 8, py + 4)
+      }
+    })
+    ctx.font = `400 9px ${FONT}`; ctx.fillStyle = ink(0.45); ctx.textAlign = "left"
+    ctx.fillText(bw === 200 ? "filled dots are measured. Move the bandwidth to predict another chip, keeping each model's measured efficiency." : "orange rings: predicted at the same efficiency each model reached on the M2 Pro (65 to 80%).", 20, H - 10)
+  }
+  return {
+    dispose: () => c?.dispose?.(),
+    frame() { if (view === "race") drawRace(); else if (view === "bandwidth") drawBandwidth() },
+    telemetry() {
+      if (view === "race") { const L = lanes().sort((a, b) => a.total - b.total); return [["fastest", `${L[0].m.name} ${L[0].total.toFixed(1)} s`, true], ["slowest", `${L[3].m.name} ${L[3].total.toFixed(1)} s`], ["prompt", prompt + " tok"], ["reply", partB ? "as measured" : reply + " tok"]] }
+      if (view === "bandwidth") return [["bandwidth", bw + " GB/s", true], ...MODELS.map((m) => [m.name, Math.round(((m.gbTok * m.decode) / 200) * 100) + "% of peak"])]
+      const ctx = CTX[ctxIdx]
+      return [["context", ctx.toLocaleString("en") + " tok", true], ...MODELS.map((m) => [m.name + " KV", kvGiB(m, ctx).toFixed(2) + " GiB"])]
+    },
+  }
+}
+
+/* ---------- 02 tokenizers (Step 2, measured) ---------- */
+function makeTokenizers(stage, ctl) {
+  let view = "six texts", sample = "portuguese", metric = "tokens"
+  const body = h("div", { class: "inst tz" })
+  stage.append(body)
+  const sub = swapView(ctl, { "six texts": 1, portuguese: 1, numbers: 1, templates: 1 }, view, (v, s) => { view = v; build(s) })
+  function render() {
+    body.replaceChildren(h("span", { class: "tag" }, "measured · six tokenizers · Step 2"))
+    if (view === "six texts") {
+      const k = Object.keys(CHARS).indexOf(sample)
+      const vals = TOKENIZERS.map((t) => ({ t, n: COUNTS[t][k], r: COUNTS[t][k] / CHARS[sample] }))
+      const v = (o) => (metric === "tokens" ? o.n : o.r)
+      const best = Math.min(...vals.map(v)), max = metric === "tokens" ? Math.max(...vals.map(v)) * 1.08 : 0.7
+      body.append(
+        h("div", {}, h("span", { class: "cap" }, `${sample} · ${CHARS[sample]} characters`), h("div", { class: "sample" }, SAMPLE_TEXT[sample])),
+        h("div", { style: "display:grid;gap:14px;align-content:start" },
+          h("div", { class: "hbars" }, ...vals.map((o) => hbar({ label: o.t, value: v(o), max, text: metric === "tokens" ? `${o.n} tok` : `${o.r.toFixed(3)} /char`, best: v(o) === best, ticks: metric === "tokens" ? [] : [0.2] }))),
+          h("div", { class: "note" }, SAMPLE_NOTE[sample], metric === "tokens" ? "" : " The thin line marks 0.2 tokens per character, the English baseline."),
+        ))
+    } else if (view === "portuguese") {
+      const pen = TOKENIZERS.map((t) => ({ t, r: COUNTS[t][1] / COUNTS[t][0], fit: Math.round(32768 / (COUNTS[t][1] / 275)) })).sort((a, b) => a.r - b.r)
+      body.append(
+        h("div", { class: "note" }, "The English and Portuguese paragraphs say the same thing, so the ratio between their token counts is the price of the language alone. 1.00 would mean no penalty."),
+        h("div", { class: "grid2" },
+          h("div", {}, h("span", { class: "cap" }, "portuguese tokens ÷ english tokens · and how many characters of portuguese fit in 32k tokens"),
+            h("div", { class: "hbars" }, ...pen.map((o, i) => hbar({ label: o.t, value: o.r - 1, max: 1, text: `${o.r.toFixed(2)}× · ${(o.fit / 1000).toFixed(0)}k ch`, best: i < 2 })))),
+          h("div", { class: "tblwrap" }, h("span", { class: "cap" }, "why · \"O gato dorme no sofá enquanto chove lá fora.\""),
+            h("table", { class: "splits" }, h("tr", {}, h("th", {}, "tokenizer"), h("th", {}, "·gato"), h("th", {}, "·sofá"), h("th", {}, "·lá")),
+              ...CAT_SPLITS.map(([name, words]) => h("tr", {}, h("td", {}, name), ...words.map((ps) => h("td", {}, ...ps.map((p) => h("span", { class: "pc" + (ps.length === 1 ? " whole" : "") }, p))))))),
+            h("p", { class: "note", style: "margin-top:12px" }, "Small English vocabularies cut Portuguese into English looking fragments and give accented letters their own token. Only the 200k vocabularies hold gato and sofá whole."))))
+    } else if (view === "numbers") {
+      body.append(
+        h("div", { class: "note" }, "\"The price is 1234567 dollars\". Three tokenizer families, three rules for digits. Fewer tokens is not the same as more useful tokens: one digit per token keeps place value visible, which helps arithmetic."),
+        h("div", { class: "tblwrap" }, h("table", { class: "splits" }, h("tr", {}, h("th", {}, "tokenizer"), h("th", {}, "1234567"), h("th", {}, "tokens"), h("th", {}, "rule")),
+          ...NUM_SPLITS.map(([name, ps, rule]) => h("tr", {}, h("td", {}, name), h("td", {}, ...ps.map((p) => h("span", { class: "pc" }, p))), h("td", {}, String(ps.length)), h("td", { style: "color:var(--ink-2)" }, rule))))),
+      )
+      const k = 4
+      body.append(h("div", {}, h("span", { class: "cap" }, "the numbers sample · \"Order 1234567 shipped on 2026-11-20 at 14:05 for $1,299.99, a 12.5% discount.\""),
+        h("div", { class: "hbars" }, ...TOKENIZERS.map((t) => hbar({ label: t, value: COUNTS[t][k], max: 55, text: COUNTS[t][k] + " tok", best: COUNTS[t][k] === 31 })))))
+    } else {
+      body.append(
+        h("div", { class: "note" }, "\"Explain what a token is in two sentences.\" sent to four Ollama models. The bare text costs 10 or 11 tokens. Each model then wraps it in its hidden chat template, and that wrapping is a fixed cost on every request."),
+        h("div", { class: "hbars" }, ...MODELS.map((m) => {
+          const r = hbar({ label: m.name, value: m.bare, max: 40, text: `${m.bare} + ${m.tmpl} = ${m.bare + m.tmpl}`, best: m.tmpl === 24 })
+          r.querySelector(".tr").append(h("span", { class: "f2", style: `left:${((m.bare / 40) * 100).toFixed(2)}%;width:${((m.tmpl / 40) * 100).toFixed(2)}%` }))
+          return r
+        })),
+        h("div", { class: "note" }, "Solid is the text, hatched is the template. Llama's 24 tokens include a system header with a knowledge cutoff date, more than twice the question itself. The totals match the prompt counts from Step 1 exactly. Llama and DeepSeek also add a start of text token, which is why they read 11 where GPT-4 and Qwen2.5 count 10."),
+      )
+    }
+  }
+  function build(s) {
+    s.replaceChildren()
+    if (view === "six texts") s.append(
+      seg({ label: "text", options: Object.keys(CHARS), value: sample, onChange: (v) => { sample = v; render() } }),
+      seg({ label: "measure", options: ["tokens", "per char"], value: metric, onChange: (v) => { metric = v; render() } }))
+    render()
+  }
+  build(sub)
+  return {
+    telemetry() {
+      if (view === "six texts") { const k = Object.keys(CHARS).indexOf(sample); const v = TOKENIZERS.map((t) => COUNTS[t][k]); return [["text", sample, true], ["characters", CHARS[sample]], ["cheapest", Math.min(...v) + " tok"], ["dearest", Math.max(...v) + " tok"]] }
+      if (view === "portuguese") return [["penalty, best", "1.24× gpt-4o, phi-4-mini", true], ["penalty, worst", "1.86× gpt2"]]
+      if (view === "numbers") return [["1234567", "3 to 7 tokens", true], ["numbers sample", "31 to 49 tokens"]]
+      return [["template, most", "llama3.2 +24", true], ["template, least", "deepseek-r1 +2"]]
+    },
+  }
+}
+
+/* ---------- 03 decoding (Step 3, real distribution from Step 0) ---------- */
+function decode(T, K, P, greedy) {
+  const logit = STEP0.top.map(([, , p]) => Math.log(p))
+  let raw
+  if (greedy || T < 0.03) raw = logit.map((_, i) => (i === 0 ? 1 : 0))
+  else { const ex = logit.map((l) => Math.exp(l / T)); const s = ex.reduce((a, b) => a + b, 0); raw = ex.map((x) => x / s) }
+  const order = [...raw.keys()].sort((a, b) => raw[b] - raw[a])
+  const kept = new Set()
+  let cum = 0
+  for (const i of order) { if (kept.size >= K) break; kept.add(i); cum += raw[i]; if (cum >= P - 1e-9) break }
+  const ks = [...kept].reduce((a, i) => a + raw[i], 0)
+  const p = raw.map((x, i) => (kept.has(i) ? x / ks : 0))
+  const entropy = -p.reduce((a, x) => (x > 0 ? a + x * Math.log2(x) : a), 0)
+  return { raw, p, kept, entropy }
+}
+function makeDecoding(stage, ctl) {
+  let mode = "temperature", T = 1, K = 5, P = 1, auto = true, counts = [0, 0, 0, 0, 0], total = 0, last = 0, samples = [], flash = -1, flashAt = 0, dirty = true
+  let dist = decode(T, K, P, false)
+  const names = STEP0.top.map(([t]) => JSON.stringify(t).slice(1, -1).replace(/^ /, "·"))
+  const next = h("span", { class: "next" }, "…")
+  const prompt = h("div", { class: "prompt" }, h("span", { class: "cap" }, "prompt · Qwen2.5 0.5B base · the five most likely next tokens, renormalised"), "The capital of France is", next)
+  const bars = h("div", { class: "bars" })
+  const rows = names.map((word) => {
+    const fill = h("span", { class: "fill" }), ghost = h("span", { class: "ghost" }), emp = h("span", { class: "emp" }), pct = h("span", { class: "p" })
+    const row = h("div", { class: "row" }, h("span", {}, word), h("span", { class: "track" }, ghost, fill, emp), pct)
+    bars.append(row)
+    return { row, fill, ghost, emp, pct }
+  })
+  const strip = h("div", { class: "strip", "aria-label": "Recent samples" })
+  stage.append(h("div", { class: "inst samp" }, h("span", { class: "tag" }, "measured distribution · Step 0 · sampling runs in your browser"), prompt, bars, h("div", {}, h("span", { class: "cap" }, "last samples · orange ticks show how often each was drawn"), strip)))
+  const reset = () => { counts = [0, 0, 0, 0, 0]; total = 0; samples = []; strip.replaceChildren(); next.textContent = "…"; flash = -1; dirty = true }
+  const update = () => { dist = decode(T, mode === "top k" ? K : 5, mode === "top p" ? P : 1, mode === "greedy"); reset() }
+  function sample() {
+    let r = Math.random(), k = 0
+    for (; k < 4; k++) { r -= dist.p[k]; if (r <= 0) break }
+    while (dist.p[k] === 0) k--
+    counts[k]++; total++
+    samples.unshift(names[k]); samples = samples.slice(0, 30)
+    next.textContent = STEP0.top[k][0].replace("\n", "↵")
+    strip.replaceChildren(...samples.map((s) => h("span", {}, s)))
+    flash = k; flashAt = performance.now(); dirty = true
+  }
+  const sub = h("div", { class: "sub-ctl" })
+  const tDial = dial({ label: "temperature", sub: "drag up or down", min: 0, max: 2, value: T, fmt: (v) => v.toFixed(2), onInput: (v) => { T = v; update() } })
+  const kS = slider({ label: "top k", min: 1, max: 5, step: 1, value: K, onInput: (v) => { K = v; update() } })
+  const pS = slider({ label: "top p", min: 0.3, max: 1, step: 0.01, value: P, fmt: (v) => v.toFixed(2), onInput: (v) => { P = v; update() } })
+  const showCtl = () => sub.replaceChildren(...(mode === "greedy" ? [] : [tDial]), ...(mode === "top k" ? [kS] : []), ...(mode === "top p" ? [pS] : []))
+  ctl.append(
+    seg({ label: "strategy", options: ["greedy", "temperature", "top k", "top p"], value: mode, onChange: (v) => { mode = v; showCtl(); update() } }),
+    sub,
+    toggle("auto sample", true, (v) => (auto = v)),
+    btn("sample ×50", () => { for (let i = 0; i < 50; i++) sample() }),
+  )
+  showCtl()
+  return {
+    frame(t) {
+      if (auto && t - last > (reduced ? 1600 : 700)) { last = t; sample() }
+      const flashing = performance.now() - flashAt < 420
+      if (!dirty && !flashing && flash === -1) return
+      rows.forEach((r, i) => {
+        r.fill.style.width = (dist.p[i] * 100).toFixed(2) + "%"
+        r.ghost.style.width = dist.kept.has(i) ? "0" : Math.max(0.4, dist.raw[i] * 100).toFixed(2) + "%"
+        r.ghost.style.display = dist.kept.has(i) ? "none" : "block"
+        r.emp.style.left = total ? `calc(${((counts[i] / total) * 100).toFixed(2)}% - 1px)` : "-9px"
+        r.emp.style.display = total && counts[i] ? "block" : "none"
+        r.pct.textContent = dist.kept.has(i) ? (dist.p[i] * 100).toFixed(1) + "%" : "cut"
+        r.row.classList.toggle("cut", !dist.kept.has(i))
+        r.row.classList.toggle("flash", flashing && i === flash)
+        r.row.style.fontWeight = Math.round(250 + 550 * dist.p[i])
+      })
+      if (!flashing) flash = -1
+      dirty = false
+    },
+    telemetry() {
+      return [["strategy", mode, true], ["temperature", mode === "greedy" ? "n/a" : T.toFixed(2)], ["kept", dist.kept.size + " of 5"], ["entropy", dist.entropy.toFixed(2) + " bits"], ["Paris drawn", total ? Math.round((counts[0] / total) * 100) + "%" : "–"]]
+    },
+  }
+}
+/* 02 embeddings */
+const CLUSTERS = [
+  { name: "infrastructure", cx: 0.18, cy: 0.26, words: ["terraform", "kubernetes", "pipeline", "deploy", "container", "helm", "azure"] },
+  { name: "animals", cx: 0.84, cy: 0.24, words: ["cat", "dog", "wolf", "tiger", "horse", "lion"] },
+  { name: "food", cx: 0.82, cy: 0.8, words: ["bread", "pasta", "rice", "cheese", "soup", "mango"] },
+  { name: "feelings", cx: 0.18, cy: 0.8, words: ["joy", "anger", "fear", "calm", "grief", "pride"] },
+]
+const PEOPLE = [["man", 0.44, 0.6], ["woman", 0.6, 0.6], ["king", 0.44, 0.42], ["queen", 0.605, 0.415], ["prince", 0.37, 0.5], ["princess", 0.68, 0.5]]
+function makeEmbeddings(stage, ctl) {
+  const root = h("div", { class: "inst fill" }, h("span", { class: "tag" }, "2 of 3,072 dimensions shown"))
+  stage.append(root)
+  const c = makeCanvas(root)
+  const R = rng(7)
+  const words = []
+  for (const cl of CLUSTERS) cl.words.forEach((w, k, all) => {
+    const a = (k / all.length) * Math.PI * 2 + R() * 0.5
+    const r = 0.05 + R() * 0.045
+    words.push({ w, x: cl.cx + Math.cos(a) * r, y: cl.cy + Math.sin(a) * r * 1.3, ph: R() * 6.28 })
+  })
+  for (const [w, x, y] of PEOPLE) words.push({ w, x, y, ph: R() * 6.28 })
+  const by = Object.fromEntries(words.map((o) => [o.w, o]))
+  let ptr = null, analogy = false, near = []
+  c.cv.addEventListener("pointermove", (e) => (ptr = localPoint(c.cv, e)))
+  c.cv.addEventListener("pointerleave", () => (ptr = null))
+  ctl.append(toggle("king − man + woman", false, (v) => (analogy = v)))
+  return {
+    dispose: c.dispose,
+    frame(t) {
+      const { ctx, w, h: H } = c
+      ctx.clearRect(0, 0, w, H)
+      graticule(ctx, w, H)
+      const pad = 46
+      const X = (x) => pad + x * (w - 2 * pad), Y = (y) => pad + y * (H - 2 * pad)
+      const m = reduced ? 0 : 1
+      for (const o of words) { o.px = X(o.x) + Math.sin(t / 1700 + o.ph) * 3 * m; o.py = Y(o.y) + Math.cos(t / 2100 + o.ph) * 3 * m }
+      ctx.font = `500 9px ${FONT}`
+      ctx.fillStyle = ink(0.22)
+      ctx.textAlign = "center"
+      for (const cl of CLUSTERS) ctx.fillText(cl.name.toUpperCase(), X(cl.cx), Y(cl.cy) - 0.2 * (H - 2 * pad) + 4)
+      ctx.fillText("PEOPLE", X(0.52), Y(0.3))
+      let px, py
+      if (ptr) { px = ptr.x; py = ptr.y }
+      else { const s = t / 5200; px = w / 2 + Math.sin(s * 1.3) * (w / 2 - pad * 1.4); py = H / 2 + Math.sin(s * 2.1 + 1) * (H / 2 - pad * 1.4) }
+      const diag = Math.hypot(w, H) * 0.5
+      near = words.map((o) => ({ o, d: Math.hypot(o.px - px, o.py - py) })).sort((a, b) => a.d - b.d).slice(0, 3)
+      near.forEach(({ o, d }, i) => {
+        ctx.strokeStyle = i === 0 ? hot() : ink(0.35)
+        ctx.lineWidth = 1
+        ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(o.px, o.py); ctx.stroke()
+        ctx.font = `400 9px ${FONT}`
+        ctx.fillStyle = i === 0 ? hot() : ink(0.5)
+        ctx.fillText((1 - d / diag).toFixed(2), (px + o.px) / 2, (py + o.py) / 2 - 4)
+      })
+      const sigma = Math.min(w, H) * 0.2
+      for (const o of words) {
+        const d = Math.hypot(o.px - px, o.py - py)
+        const prox = Math.exp(-(d * d) / (2 * sigma * sigma))
+        ctx.font = `${Math.round(250 + 550 * prox)} 12px ${FONT}`
+        ctx.fillStyle = o === near[0].o ? hot() : ink(0.35 + 0.65 * prox)
+        ctx.fillText(o.w, o.px, o.py + 4)
+        ctx.fillStyle = ink(0.5)
+        ctx.fillRect(o.px - 1, o.py - 9, 2, 2)
+      }
+      ctx.strokeStyle = hot(); ctx.lineWidth = 1
+      ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI * 2); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(px - 12, py); ctx.lineTo(px - 7, py); ctx.moveTo(px + 7, py); ctx.lineTo(px + 12, py)
+      ctx.moveTo(px, py - 12); ctx.lineTo(px, py - 7); ctx.moveTo(px, py + 7); ctx.lineTo(px, py + 12); ctx.stroke()
+      if (analogy) {
+        const p = reduced ? 1 : (t % 3600) / 3600
+        const a = by.man, b = by.king, s = by.woman
+        const vx = b.px - a.px, vy = b.py - a.py
+        const g1 = clamp(p / 0.35, 0, 1), g2 = clamp((p - 0.4) / 0.35, 0, 1)
+        if (g1 > 0) arrow(ctx, a.px, a.py - 12, a.px + vx * g1, a.py - 12 + vy * g1, ink(0.8))
+        if (g2 > 0) arrow(ctx, s.px, s.py - 12, s.px + vx * g2, s.py - 12 + vy * g2, hot(), 2)
+        if (g2 >= 1) {
+          ctx.strokeStyle = hot(); ctx.setLineDash([3, 3])
+          ctx.beginPath(); ctx.arc(s.px + vx, s.py - 12 + vy, 14, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([])
+          ctx.font = `600 10px ${FONT}`; ctx.fillStyle = hot(); ctx.textAlign = "left"
+          ctx.fillText("lands next to queen", s.px + vx + 20, s.py - 12 + vy + 3)
+          ctx.textAlign = "center"
+        }
+      }
+    },
+    telemetry() {
+      const n = near[0]
+      return [["nearest", n ? n.o.w : "–", true], ["similarity", n ? (1 - n.d / (Math.hypot(c.w, c.h) * 0.5)).toFixed(2) : "–"], ["words on map", words.length], ["dimensions shown", "2 of 3,072"]]
+    },
+  }
+}
+
+/* 03 attention */
+const TOK = ["The", "engineer", "rolled", "back", "the", "model", "because", "it", "failed", "the", "eval", "."]
+const HEAD_BOOST = {
+  coreference: { 4: { 1: 0.4 }, 6: { 5: 1.2 }, 7: { 5: 4, 1: 1.2 }, 8: { 7: 2, 5: 1.5 }, 10: { 5: 1.6, 8: 1 }, 11: { 5: 0.8 } },
+  syntax: { 1: { 0: 1.5 }, 2: { 1: 3 }, 3: { 2: 3 }, 4: { 3: 0.6 }, 5: { 2: 2.5, 4: 1.2 }, 6: { 2: 1.2 }, 7: { 6: 1.5 }, 8: { 7: 3 }, 9: { 8: 1.4 }, 10: { 8: 2.4, 9: 1 }, 11: { 2: 1.5, 8: 1.5 } },
+}
+function attWeights(head, i) {
+  const w = Array.from({ length: i + 1 }, (_, j) => Math.exp(-(i - j) / 2.2) * 0.5)
+  w[0] += 0.35
+  const boost = head === "previous token" ? { [i - 1]: 3.2, [i]: 0.4 } : HEAD_BOOST[head][i] || {}
+  for (const [j, b] of Object.entries(boost)) if (+j >= 0 && +j <= i) w[+j] += b
+  const s = w.reduce((a, b) => a + b, 0)
+  return w.map((x) => x / s)
+}
+function makeAttention(stage, ctl) {
+  const n = TOK.length
+  let head = "coreference", hoverQ = null, lastKey = "", current = { q: 0, w: [1] }
+  const line = h("div", { class: "att-line" })
+  const spans = TOK.map((tk, i) => {
+    const s = h("span", {}, tk)
+    s.addEventListener("pointerenter", () => (hoverQ = i))
+    s.addEventListener("pointerleave", () => (hoverQ = null))
+    line.append(s)
+    return s
+  })
+  const svg = svgEl("svg", { viewBox: "0 0 520 340", class: "att-svg", preserveAspectRatio: "xMidYMid meet" })
+  svgEl("text", { x: 172, y: 12, "text-anchor": "end", class: "hd" }, svg).textContent = "KEYS · LOOKED AT"
+  svgEl("text", { x: 348, y: 12, class: "hd" }, svg).textContent = "QUERY · LOOKING"
+  const yOf = (i) => 38 + i * 25
+  const lines = TOK.map((_, j) => svgEl("line", { x1: 180, y1: yOf(j) - 4, x2: 340, stroke: ink(1), "stroke-linecap": "round" }, svg))
+  const left = TOK.map((tk, i) => { const t = svgEl("text", { x: 172, y: yOf(i), "text-anchor": "end" }, svg); t.textContent = tk; return t })
+  const right = TOK.map((tk, i) => {
+    const t = svgEl("text", { x: 348, y: yOf(i) }, svg)
+    t.textContent = tk
+    t.addEventListener("pointerenter", () => (hoverQ = i))
+    t.addEventListener("pointerleave", () => (hoverQ = null))
+    return t
+  })
+  const heatWrap = h("div", { class: "fill" })
+  const heatCap = h("span", { class: "cap" }, head + " head · this layer")
+  const heat = h("div", { class: "att-heat" }, heatCap, h("div", { style: "position:relative" }, heatWrap), h("span", { class: "note" }, "Upper triangle is masked. A token can never look ahead."))
+  const root = h("div", { class: "inst att" }, line, h("div", { class: "att-body" }, svg, heat))
+  stage.append(root)
+  const hc = makeCanvas(heatWrap)
+  ctl.append(seg({ label: "head", options: ["coreference", "syntax", "previous token"], value: head, onChange: (v) => { head = v; heatCap.textContent = v + " head · this layer" } }))
+  function drawHeat(q) {
+    const { ctx, w, h: H } = hc
+    ctx.clearRect(0, 0, w, H)
+    const s = Math.floor(Math.min(w, H) / n)
+    if (s < 3) return
+    const ox = Math.floor((w - s * n) / 2)
+    for (let r = 0; r < n; r++) {
+      const wr = attWeights(head, r)
+      for (let col = 0; col < n; col++) {
+        const x = ox + col * s, y = r * s
+        if (col > r) {
+          ctx.strokeStyle = ink(0.08); ctx.beginPath(); ctx.moveTo(x + 1, y + s - 1); ctx.lineTo(x + s - 1, y + 1); ctx.stroke()
+        } else {
+          ctx.fillStyle = ink(clamp(wr[col] * 1.6, 0.04, 1)); ctx.fillRect(x + 0.5, y + 0.5, s - 1, s - 1)
+        }
+      }
+    }
+    ctx.strokeStyle = hot(); ctx.lineWidth = 1.5
+    ctx.strokeRect(ox + 0.5, q * s + 0.5, s * n - 1, s - 1)
+  }
+  return {
+    dispose: hc.dispose,
+    frame(t) {
+      const q = hoverQ ?? (reduced ? 7 : Math.floor(t / 1600) % n)
+      drawHeat(q)
+      const key = head + q
+      if (key === lastKey) return
+      lastKey = key
+      const w = attWeights(head, q)
+      const mx = Math.max(...w)
+      const top = w.indexOf(mx)
+      current = { q, w, top }
+      spans.forEach((s, j) => {
+        s.classList.toggle("q", j === q)
+        if (j > q) { s.style.fontWeight = 200; s.style.opacity = 0.22; s.style.background = "none" }
+        else { s.style.fontWeight = Math.round(200 + 600 * (w[j] / mx)); s.style.opacity = 1; s.style.background = j === q ? "none" : ink((w[j] * 0.55).toFixed(3)) }
+      })
+      lines.forEach((l, j) => {
+        if (j > q) { l.setAttribute("stroke-opacity", 0); return }
+        l.setAttribute("y2", yOf(q) - 4)
+        l.setAttribute("stroke-width", (0.5 + 9 * w[j]).toFixed(2))
+        l.setAttribute("stroke-opacity", (0.12 + 0.88 * (w[j] / mx)).toFixed(2))
+        l.setAttribute("stroke", j === top ? hot() : ink(1))
+      })
+      left.forEach((tx, j) => {
+        tx.setAttribute("fill", j === top ? hot() : ink(j > q ? 0.18 : 1))
+        tx.setAttribute("font-weight", j > q ? 200 : Math.round(200 + 600 * (w[j] / mx)))
+      })
+      right.forEach((tx, j) => { tx.setAttribute("fill", j === q ? hot() : ink(0.4)); tx.setAttribute("font-weight", j === q ? 700 : 300) })
+    },
+    telemetry() {
+      const { q, w, top } = current
+      return [["head", head], ["query", TOK[q], true], ["looks most at", TOK[top ?? 0]], ["weight", (w[top ?? 0] ?? 1).toFixed(2)], ["share on first token", w[0].toFixed(2)]]
+    },
+  }
+}
+/* 05 context */
+const SEGS = [["system", 1200], ["tools", 3500], ["examples", 2400], ["docs", 800], ["history", 420], ["user", 300], ["reserve", 4000]]
+function makeContext(stage, ctl) {
+  let win = 32000, tools = true, shots = true, docs = 10, turns = 60, flashUntil = 0, lastDropped = 0, plan
+  const cvwrap = h("div", { class: "cvwrap" })
+  const legend = h("div", { class: "legend" }, ...["system prompt:system", "tool schemas:tools", "few-shot examples:examples", "retrieved docs:docs", "chat history:history", "user message:user", "reserved for reply:reserve", "free:free"].map((s) => {
+    const [label, k] = s.split(":")
+    return h("span", {}, h("i", { class: "sw-" + k }), label)
+  }))
+  stage.append(h("div", { class: "inst ctx" }, cvwrap, legend))
+  const c = makeCanvas(cvwrap)
+  function compute() {
+    const tok = { system: 1200, tools: tools ? 3500 : 0, examples: shots ? 2400 : 0, docs: docs * 800, history: turns * 420, user: 300, reserve: 4000 }
+    let total = Object.values(tok).reduce((a, b) => a + b, 0)
+    let over = total - win, droppedTurns = 0, droppedDocs = 0
+    if (over > 0) { droppedTurns = Math.min(turns, Math.ceil(over / 420)); tok.history -= droppedTurns * 420; over -= droppedTurns * 420 }
+    if (over > 0) { droppedDocs = Math.min(docs, Math.ceil(over / 800)); tok.docs -= droppedDocs * 800; over -= droppedDocs * 800 }
+    total = Object.values(tok).reduce((a, b) => a + b, 0)
+    return { tok, total, droppedTurns, droppedDocs, rejected: over > 0 }
+  }
+  plan = compute()
+  const refresh = () => {
+    plan = compute()
+    const d = plan.droppedTurns + plan.droppedDocs
+    if (d !== lastDropped && d > 0) flashUntil = performance.now() + 450
+    lastDropped = d
+  }
+  ctl.append(
+    seg({ label: "window", options: ["4k", "8k", "32k", "128k"], value: "32k", onChange: (v) => { win = parseInt(v) * 1000; refresh() } }),
+    slider({ label: "retrieved docs", min: 0, max: 40, step: 1, value: docs, onInput: (v) => { docs = v; refresh() } }),
+    slider({ label: "history turns", min: 0, max: 400, step: 1, value: turns, onInput: (v) => { turns = v; refresh() } }),
+    toggle("tool schemas", true, (v) => { tools = v; refresh() }),
+    toggle("examples", true, (v) => { shots = v; refresh() }),
+  )
+  function cellPattern(ctx, k, x, y, s, flashing) {
+    if (k === "system") { ctx.fillStyle = ink(1); ctx.fillRect(x, y, s, s) }
+    else if (k === "tools") { ctx.fillStyle = ink(0.55); ctx.fillRect(x, y, s, s) }
+    else if (k === "examples") { ctx.strokeStyle = ink(0.35); ctx.strokeRect(x + 0.5, y + 0.5, s - 1, s - 1); ctx.strokeStyle = ink(0.9); ctx.beginPath(); ctx.moveTo(x + 1, y + s - 1); ctx.lineTo(x + s - 1, y + 1); ctx.stroke() }
+    else if (k === "docs") { ctx.fillStyle = ink(1); ctx.beginPath(); ctx.arc(x + s / 2, y + s / 2, s * 0.24, 0, Math.PI * 2); ctx.fill() }
+    else if (k === "history") { ctx.strokeStyle = flashing ? hot() : ink(0.7); ctx.strokeRect(x + 0.5, y + 0.5, s - 1, s - 1) }
+    else if (k === "user") { ctx.fillStyle = ink(1); ctx.fillRect(x, y, s, s); ctx.fillStyle = "#060606"; ctx.fillRect(x + 3, y + 3, s - 6, s - 6); ctx.fillStyle = ink(1); ctx.fillRect(x + 5, y + 5, s - 10, s - 10) }
+    else if (k === "reserve") { ctx.setLineDash([2, 2]); ctx.strokeStyle = ink(0.45); ctx.strokeRect(x + 0.5, y + 0.5, s - 1, s - 1); ctx.setLineDash([]) }
+    else { ctx.fillStyle = ink(0.16); ctx.fillRect(x + s / 2 - 1, y + s / 2 - 1, 2, 2) }
+  }
+  return {
+    dispose: c.dispose,
+    frame(t) {
+      const { ctx, w, h: H } = c
+      ctx.clearRect(0, 0, w, H)
+      const pad = 22, top = 34, stripH = 64, gap = 2, cells = 400
+      const gw = w - 2 * pad, gh = H - top - stripH - 28
+      let s = 34, cols, rows
+      for (; s > 4; s--) { cols = Math.floor((gw + gap) / (s + gap)); rows = Math.ceil(cells / cols); if (rows * (s + gap) <= gh) break }
+      cols = Math.floor((gw + gap) / (s + gap)); rows = Math.ceil(cells / cols)
+      const block = win / cells
+      const order = SEGS.map(([k]) => [k, plan.tok[k]])
+      const flashing = performance.now() < flashUntil
+      ctx.font = `500 9px ${FONT}`; ctx.fillStyle = ink(0.4); ctx.textAlign = "left"
+      ctx.fillText(`CONTEXT WINDOW · ${win.toLocaleString("en")} TOKENS · 1 CELL = ${Math.round(block).toLocaleString("en")} TOKENS`, pad, 20)
+      for (let i = 0; i < cells; i++) {
+        const mid = i * block + block / 2
+        let acc = 0, kind = "free"
+        for (const [k, v] of order) { if (mid < acc + v) { kind = k; break } acc += v }
+        const x = pad + (i % cols) * (s + gap), y = top + Math.floor(i / cols) * (s + gap)
+        cellPattern(ctx, kind, x, y, s, flashing)
+      }
+      const sy = top + rows * (s + gap) + 22
+      const used = Math.min(1, plan.total / win)
+      ctx.fillStyle = ink(0.4); ctx.fillText("RECALL BY POSITION · MODELS FORGET THE MIDDLE OF LONG CONTEXTS", pad, sy - 6)
+      ctx.strokeStyle = ink(0.1); ctx.beginPath(); ctx.moveTo(pad, sy + stripH - 20 + 0.5); ctx.lineTo(pad + gw, sy + stripH - 20 + 0.5); ctx.stroke()
+      const yv = (r) => sy + (1 - r) * (stripH - 24)
+      const rec = (u) => 0.93 - 0.32 * Math.pow(Math.sin(Math.PI * u), 1.4) * Math.min(1, plan.total / 30000)
+      ctx.beginPath()
+      for (let i = 0; i <= 80; i++) { const u = i / 80; const x = pad + u * used * gw; i ? ctx.lineTo(x, yv(rec(u))) : ctx.moveTo(x, yv(rec(u))) }
+      ctx.strokeStyle = ink(0.85); ctx.lineWidth = 1.25; ctx.stroke(); ctx.lineWidth = 1
+      ctx.lineTo(pad + used * gw, sy + stripH - 20); ctx.lineTo(pad, sy + stripH - 20); ctx.closePath(); ctx.fillStyle = ink(0.06); ctx.fill()
+      const mx = pad + 0.5 * used * gw
+      ctx.fillStyle = hot(); ctx.beginPath(); ctx.arc(mx, yv(rec(0.5)), 3, 0, Math.PI * 2); ctx.fill()
+      ctx.fillText(Math.round(rec(0.5) * 100) + "% recall mid-window", mx + 8, yv(rec(0.5)) + 3)
+      if (plan.rejected) { ctx.fillStyle = hot(); ctx.font = `700 11px ${FONT}`; ctx.fillText("REQUEST REJECTED · PROMPT DOES NOT FIT EVEN AFTER DROPPING HISTORY AND DOCS", pad, H - 8) }
+    },
+    telemetry() {
+      const dropped = plan.droppedTurns || plan.droppedDocs
+      return [["used", `${plan.total.toLocaleString("en")} / ${win.toLocaleString("en")}`], ["fill", Math.round((plan.total / win) * 100) + "%", plan.total / win > 0.9], ["dropped turns", plan.droppedTurns, dropped], ["dropped docs", plan.droppedDocs, plan.droppedDocs > 0], ["input cost per call", plan.rejected ? "rejected" : "$" + (((plan.total - plan.tok.reserve) * 3) / 1e6).toFixed(4), plan.rejected]]
+    },
+  }
+}
+
+/* 06 rag */
+function makeRag(stage, ctl) {
+  let chunk = 256, k = 5, rerank = false, rewrite = false, Q = { x: 0.34, y: 0.6 }, dragging = false, dots = [], gold = 0, res = { list: [], recall: 0, precision: 0 }, lastKey = ""
+  const A = { x: 0.66, y: 0.4 }
+  const cvwrap = h("div", { class: "cvwrap" })
+  const list = h("ol")
+  const sum = h("div", { class: "sum" })
+  stage.append(h("div", { class: "inst rag" }, cvwrap, h("aside", {}, h("span", { class: "cap" }, "top k retrieved"), list, sum)))
+  const c = makeCanvas(cvwrap)
+  function build() {
+    const R = rng(chunk * 13 + 1)
+    const nGold = clamp(Math.round(1536 / chunk), 2, 12)
+    const nAll = Math.round(24000 / chunk)
+    dots = []
+    for (let i = 0; i < nGold; i++) dots.push({ x: A.x + gauss(R) * 0.035, y: A.y + gauss(R) * 0.04, gold: true, noise: R() })
+    for (let i = 0; i < 5; i++) dots.push({ x: 0.42 + gauss(R) * 0.03, y: 0.5 + gauss(R) * 0.04, gold: false, noise: R() })
+    for (let i = dots.length; i < nAll; i++) {
+      let x, y
+      do { x = 0.05 + R() * 0.9; y = 0.1 + R() * 0.84 } while (Math.hypot(x - A.x, y - A.y) < 0.09)
+      dots.push({ x, y, gold: false, noise: R() })
+    }
+    dots.forEach((d, i) => (d.id = "c" + String(((i * 7919) % 9000) + 1000)))
+    gold = nGold
+    lastKey = ""
+  }
+  build()
+  const eff = () => (rewrite ? { x: lerp(Q.x, A.x, 0.6), y: lerp(Q.y, A.y, 0.6) } : Q)
+  function retrieve() {
+    const E = eff()
+    const ranked = dots.map((d) => ({ d, dist: Math.hypot(d.x - E.x, d.y - E.y) })).sort((a, b) => a.dist - b.dist)
+    let top = ranked.slice(0, k)
+    if (rerank) {
+      top = ranked.slice(0, k * 3).map((r) => ({ ...r, rel: Math.hypot(r.d.x - A.x, r.d.y - A.y) * (r.d.gold ? 0.5 : 1) + r.d.noise * 0.03 })).sort((a, b) => a.rel - b.rel).slice(0, k)
+    }
+    const g = top.filter((r) => r.d.gold).length
+    return { list: top, recall: g / gold, precision: g / k }
+  }
+  const refreshList = () => {
+    const key = res.list.map((r) => `${r.d.id}:${(clamp(1 - r.dist * 1.6, 0, 1) * 100).toFixed(0)}`).join() + k + rerank
+    if (key === lastKey) return
+    lastKey = key
+    list.replaceChildren(...res.list.map((r, i) => {
+      const sim = clamp(1 - r.dist * 1.6, 0, 1)
+      return h("li", { class: r.d.gold ? "gold" : "" }, h("span", {}, String(i + 1).padStart(2, "0")), h("span", {}, r.d.id), h("span", { class: "sb" }, h("i", { style: `width:${(sim * 100).toFixed(0)}%` })), h("span", { class: "g", title: r.d.gold ? "answers the question" : "does not answer it" }, r.d.gold ? "●" : "○"))
+    }))
+    sum.replaceChildren(
+      h("span", {}, "recall@" + k + " ", h("b", {}, Math.round(res.recall * 100) + "%"), ` (${res.list.filter((r) => r.d.gold).length} of ${gold} answer chunks)`),
+      h("span", {}, "context added ", h("b", {}, (k * chunk).toLocaleString("en") + " tokens")),
+      h("span", {}, rerank ? "reranker pulled 3k candidates, kept k" : "ordered by vector distance only"),
+    )
+  }
+  const move = (e) => { const p = localPoint(c.cv, e); Q = { x: clamp((p.x - 20) / (c.w - 40), 0.02, 0.98), y: clamp((p.y - 70) / (c.h - 90), 0.02, 0.98) } }
+  // dragging holds the pointer that started the drag, so other pointers and a cancelled gesture cannot move Q.
+  c.cv.addEventListener("pointerdown", (e) => { dragging = e.pointerId; c.cv.setPointerCapture(e.pointerId); move(e) })
+  c.cv.addEventListener("pointermove", (e) => dragging === e.pointerId && move(e))
+  c.cv.addEventListener("pointerup", (e) => { if (dragging === e.pointerId) dragging = false })
+  c.cv.addEventListener("lostpointercapture", (e) => { if (dragging === e.pointerId) dragging = false })
+  ctl.append(
+    slider({ label: "chunk size", min: 128, max: 1024, step: 128, value: chunk, fmt: (v) => v + " tok", onInput: (v) => { chunk = v; build() } }),
+    slider({ label: "top k", min: 1, max: 12, step: 1, value: k, onInput: (v) => (k = v) }),
+    toggle("rewrite query", false, (v) => (rewrite = v)),
+    toggle("rerank", false, (v) => (rerank = v)),
+  )
+  const STAGES = () => [["query", 0], ["embed", 18], ["search", 6], ["rerank", rerank ? 140 : 0], ["prompt", Math.round(k * chunk * 0.12)], ["generate", 950]]
+  return {
+    dispose: c.dispose,
+    frame(t) {
+      res = retrieve()
+      refreshList()
+      const { ctx, w, h: H } = c
+      if (w <= 40 || H <= 90) return
+      ctx.clearRect(0, 0, w, H)
+      const X = (x) => 20 + x * (w - 40), Y = (y) => 70 + y * (H - 90)
+      graticule(ctx, w, H)
+      const st = STAGES(), sx = (i) => 30 + (i * (w - 60)) / (st.length - 1)
+      ctx.strokeStyle = ink(0.3); ctx.beginPath(); ctx.moveTo(sx(0), 30.5); ctx.lineTo(sx(st.length - 1), 30.5); ctx.stroke()
+      ctx.font = `500 9px ${FONT}`; ctx.textAlign = "center"
+      st.forEach(([name, ms], i) => {
+        const off = name === "rerank" && !rerank
+        ctx.fillStyle = "#060606"; ctx.fillRect(sx(i) - 4, 26, 8, 8)
+        ctx.strokeStyle = ink(off ? 0.2 : 0.9)
+        if (off) ctx.setLineDash([2, 2])
+        ctx.strokeRect(sx(i) - 3.5, 26.5, 7, 7); ctx.setLineDash([])
+        ctx.fillStyle = ink(off ? 0.25 : 0.7)
+        ctx.fillText(name.toUpperCase(), sx(i), 18)
+        ctx.fillText(off ? "off" : ms ? ms + " ms" : "", sx(i), 48)
+      })
+      const p = reduced ? 0 : (t % 2400) / 2400
+      const px = sx(0) + p * (sx(st.length - 1) - sx(0))
+      ctx.fillStyle = hot(); ctx.fillRect(px - 3, 27, 6, 6)
+      ctx.setLineDash([3, 3]); ctx.strokeStyle = ink(0.3)
+      ctx.beginPath(); ctx.ellipse(X(A.x), Y(A.y), 0.09 * (w - 40), 0.09 * (H - 90), 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([])
+      ctx.fillStyle = ink(0.35); ctx.textAlign = "center"; ctx.fillText("WHERE THE ANSWER LIVES", X(A.x), Y(A.y) - 0.09 * (H - 90) - 6)
+      const E = eff()
+      const picked = new Set(res.list.map((r) => r.d))
+      res.list.forEach((r) => { ctx.strokeStyle = hot(0.55); ctx.beginPath(); ctx.moveTo(X(E.x), Y(E.y)); ctx.lineTo(X(r.d.x), Y(r.d.y)); ctx.stroke() })
+      for (const d of dots) {
+        const x = X(d.x), y = Y(d.y)
+        if (picked.has(d)) { ctx.fillStyle = ink(1); ctx.fillRect(x - 3, y - 3, 6, 6) }
+        else { ctx.fillStyle = ink(0.35); ctx.fillRect(x - 1, y - 1, 2, 2) }
+        if (d.gold) { ctx.strokeStyle = ink(0.9); ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.stroke() }
+      }
+      res.list.forEach((r, i) => { ctx.fillStyle = ink(0.9); ctx.textAlign = "left"; ctx.fillText(String(i + 1), X(r.d.x) + 8, Y(r.d.y) - 6) })
+      if (rewrite) { arrow(ctx, X(Q.x), Y(Q.y), X(E.x), Y(E.y), hot(0.8), 1); ctx.fillStyle = hot(); ctx.fillText("rewritten", X(E.x) + 10, Y(E.y) + 14) }
+      const qx = X(Q.x), qy = Y(Q.y)
+      ctx.strokeStyle = hot(); ctx.lineWidth = 1.5
+      ctx.beginPath(); ctx.arc(qx, qy, 8, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1
+      ctx.beginPath(); ctx.moveTo(qx - 16, qy); ctx.lineTo(qx + 16, qy); ctx.moveTo(qx, qy - 16); ctx.lineTo(qx, qy + 16); ctx.stroke()
+      ctx.fillStyle = hot(); ctx.textAlign = "left"; ctx.font = `600 10px ${FONT}`
+      ctx.fillText("QUERY · drag me", qx + 12, qy - 12)
+    },
+    telemetry() {
+      const lat = STAGES().reduce((a, [, ms]) => a + ms, 0)
+      return [["recall@" + k, Math.round(res.recall * 100) + "%", res.recall < 0.5], ["precision", Math.round(res.precision * 100) + "%"], ["chunks in store", dots.length], ["context tokens", (k * chunk).toLocaleString("en")], ["latency", lat.toLocaleString("en") + " ms"]]
+    },
+  }
+}
+
+/* 07 agents */
+const SCRIPT = [
+  { ph: "plan", txt: "Find out why the prod release pipeline failed" },
+  { ph: "act", txt: "az pipelines runs show --id 4812" },
+  { ph: "observe", txt: "stage terraform_apply exited 1: state lock held" },
+  { ph: "reflect", txt: "Lock is 2h old. The run holding it was cancelled." },
+  { ph: "act", txt: "az storage blob lease show tfstate/prod.tfstate" },
+  { ph: "observe", txt: "lease held by run 4809, status cancelled" },
+  { ph: "plan", txt: "Release the stale lock, then re-run apply" },
+  { ph: "act", txt: "terraform force-unlock 8c1e2f", gated: true },
+  { ph: "observe", txt: "lock released" },
+  { ph: "act", txt: "az pipelines run --name release-prod" },
+  { ph: "observe", txt: "run 4813 succeeded, apply clean, 0 drift" },
+  { ph: "reflect", txt: "Done. Post a summary to the incident channel." },
+]
+const PH = { plan: { a: 0, r: 1, g: "◇" }, act: { a: 90, r: 1, g: "→" }, observe: { a: 180, r: 1, g: "←" }, reflect: { a: 270, r: 1, g: "↺" }, gate: { a: 90, r: 1.52, g: "■" }, done: { a: 0, r: 0, g: "✓" } }
+function makeAgent(stage, ctl) {
+  let idx = 0, pending = [], guard = true, injectErr = false, speed = 1100, last = 0, steps = 0, tools = 0, tokens = 0, approvals = 0, from = "done", to = "done", movedAt = 0
+  const R = rng(3)
+  const svg = svgEl("svg", { viewBox: "0 0 420 420", preserveAspectRatio: "xMidYMid meet" })
+  const cx = 180, cy = 210, rad = 128
+  svgEl("circle", { cx, cy, r: rad, fill: "none", stroke: ink(0.14) }, svg)
+  for (let a = 45; a < 360; a += 90) {
+    const [x, y] = polar(cx, cy, rad, a)
+    svgEl("path", { d: `M-4,-4L0,0L-4,4`, transform: `translate(${x},${y}) rotate(${a})`, fill: "none", stroke: ink(0.4) }, svg)
+  }
+  const gateLink = svgEl("line", { x1: cx + rad + 30, y1: cy, x2: cx + rad * 1.52 - 22, y2: cy, stroke: ink(0.4), "stroke-dasharray": "3 3" }, svg)
+  const nodes = {}
+  for (const k of ["plan", "act", "observe", "reflect", "gate"]) {
+    const { a, r } = PH[k]
+    const [x, y] = polar(cx, cy, rad * r, a)
+    const g = svgEl("g", { transform: `translate(${x},${y})` }, svg)
+    const shape = k === "gate"
+      ? svgEl("rect", { x: -22, y: -22, width: 44, height: 44, fill: "#060606", stroke: ink(0.5), "stroke-dasharray": "3 3" }, g)
+      : svgEl("circle", { r: 30, fill: "#060606", stroke: ink(0.4) }, g)
+    const label = svgEl("text", { "text-anchor": "middle", y: 4, "font-size": 10, fill: ink(0.8), "letter-spacing": "0.08em" }, g)
+    label.textContent = k === "gate" ? "HUMAN" : k.toUpperCase()
+    nodes[k] = { g, shape, label }
+  }
+  const center = svgEl("text", { x: cx, y: cy - 4, "text-anchor": "middle", "font-size": 13, "font-weight": 700, fill: ink(1) }, svg)
+  center.textContent = "LLM"
+  const centerSub = svgEl("text", { x: cx, y: cy + 14, "text-anchor": "middle", "font-size": 9, fill: ink(0.4) }, svg)
+  const pulse = svgEl("circle", { r: 5, fill: hot() }, svg)
+  const ol = h("ol", { tabindex: "0", role: "region", "aria-label": "Agent trace" })
+  stage.append(h("div", { class: "inst agent" }, svg, h("div", { class: "trace" }, h("span", { class: "cap" }, "trace · newest at the bottom"), ol)))
+  ctl.append(
+    slider({ label: "step every", min: 400, max: 2400, step: 100, value: speed, fmt: (v) => (v / 1000).toFixed(1) + " s", onInput: (v) => (speed = v) }),
+    toggle("approval gate", true, (v) => (guard = v)),
+    btn("inject tool error", () => (injectErr = true)),
+  )
+  function nextStep() {
+    if (pending.length) {
+      if (pending[0].notBefore && performance.now() < pending[0].notBefore) return null
+      const q = pending.shift()
+      // An approved action can fail too. The retry itself (backoff) never takes the injected error.
+      if (q.ph === "act" && !q.backoff && injectErr) {
+        injectErr = false
+        pending.unshift({ ph: "observe", txt: "error 429: too many requests", err: true }, { ph: "reflect", txt: "Transient. Back off 2s and retry once." }, { ph: "act", txt: q.txt + " (retry)", backoff: true })
+      }
+      return q
+    }
+    if (idx >= SCRIPT.length) { idx = 0; return { ph: "done", txt: "Run complete. Summary posted to #incidents.", done: true } }
+    const s = SCRIPT[idx++]
+    if (s.gated && guard) {
+      pending.push({ ph: "gate", txt: "approved by on-call engineer" }, { ph: "act", txt: s.txt })
+      return { ph: "gate", txt: "needs approval: force-unlock changes prod state" }
+    }
+    if (s.ph === "act" && injectErr) {
+      injectErr = false
+      pending.push({ ph: "observe", txt: "error 429: too many requests", err: true }, { ph: "reflect", txt: "Transient. Back off 2s and retry once." }, { ph: "act", txt: s.txt + " (retry)", backoff: true })
+    }
+    if (s.gated && !guard) return { ...s, txt: s.txt + "  · ran without approval", err: true }
+    return s
+  }
+  function push(s) {
+    if (s.err && s.ph === "observe") { const r = pending.find((x) => x.backoff); if (r) r.notBefore = performance.now() + 2000 }
+    steps++
+    if (s.ph === "act") tools++
+    if (s.ph === "gate" && s.txt.startsWith("approved")) approvals++
+    tokens += 250 + Math.round(R() * 650)
+    from = to; to = s.ph; movedAt = performance.now()
+    const li = h("li", { class: "new" + (s.err ? " err" : "") + (s.done ? " done" : "") }, h("span", {}, PH[s.ph].g), h("span", { class: "ph" }, s.ph), h("span", {}, s.txt))
+    // Follow the newest step only when the reader is already at the bottom.
+    const atBottom = ol.scrollHeight - ol.scrollTop - ol.clientHeight < 24
+    ol.append(li)
+    setTimeout(() => li.classList.remove("new"), 60)
+    while (ol.children.length > 15) ol.firstChild.remove()
+    if (atBottom) ol.scrollTop = ol.scrollHeight
+  }
+  return {
+    frame(t) {
+      if (t - last > speed) { const s = nextStep(); if (s) { last = t; push(s) } }
+      // An approval already queued still runs, so its gate stays visible until it does.
+      gateLink.style.display = nodes.gate.g.style.display = guard || to === "gate" || pending.some((p) => p.ph === "gate") ? "" : "none"
+      for (const [k, n] of Object.entries(nodes)) {
+        const on = k === to
+        n.shape.setAttribute("stroke", on ? hot() : ink(k === "gate" ? 0.5 : 0.4))
+        n.shape.setAttribute("stroke-width", on ? 2 : 1)
+        n.label.setAttribute("fill", on ? hot() : ink(0.8))
+      }
+      centerSub.textContent = tokens.toLocaleString("en") + " tokens"
+      const p = reduced ? 1 : clamp((performance.now() - movedAt) / 420, 0, 1)
+      const e = 1 - Math.pow(1 - p, 4)
+      const A = PH[from], B = PH[to]
+      let a0 = A.a, a1 = B.a
+      if (a1 < a0 && !(B.r === 0 || A.r === 0)) a1 += 360
+      const [x, y] = polar(cx, cy, rad * lerp(A.r, B.r, e), lerp(a0, a1, e))
+      pulse.setAttribute("cx", x); pulse.setAttribute("cy", y)
+    },
+    telemetry() {
+      return [["phase", to, true], ["steps", steps], ["tool calls", tools], ["approvals", approvals], ["tokens", tokens.toLocaleString("en")], ["cost", "$" + ((tokens * 6) / 1e6).toFixed(4)]]
+    },
+  }
+}
+
+/* 08 evals and serving */
+function makeEvals(stage, ctl) {
+  const R = rng(42)
+  const v3 = Array.from({ length: 200 }, () => clamp(76 + gauss(R) * 13, 0, 100))
+  const v4 = [...Array.from({ length: 184 }, () => clamp(86 + gauss(R) * 7.5, 0, 100)), ...Array.from({ length: 16 }, () => clamp(31 + gauss(R) * 7, 0, 100))]
+  let thr = 70, rps = 18, cache = false, ttft = [], tps = [], lastTick = 0, dragging = false, cur = { p95: 0, tps: 0, err: 0 }
+  const root = h("div", { class: "inst fill" })
+  stage.append(root)
+  const c = makeCanvas(root)
+  const pass = (arr) => arr.filter((x) => x >= thr).length / arr.length
+  const thrCtl = slider({ label: "pass threshold", min: 40, max: 100, step: 1, value: thr, onInput: (v) => (thr = v) })
+  ctl.append(thrCtl,
+    slider({ label: "load", min: 1, max: 60, step: 1, value: rps, fmt: (v) => v + " req/s", onInput: (v) => (rps = v) }),
+    toggle("prompt cache", false, (v) => (cache = v)))
+  let hx = { x0: 0, x1: 0, top: 0, bottom: 0 }
+  const setFrom = (e) => { const p = localPoint(c.cv, e); thr = Math.round(clamp(((p.x - hx.x0) / (hx.x1 - hx.x0)) * 100, 40, 100)); thrCtl.set(thr) }
+  c.cv.addEventListener("pointerdown", (e) => { const p = localPoint(c.cv, e); if (p.y > hx.top && p.y < hx.bottom) { dragging = e.pointerId; c.cv.setPointerCapture(e.pointerId); setFrom(e) } })
+  c.cv.addEventListener("pointermove", (e) => dragging === e.pointerId && setFrom(e))
+  c.cv.addEventListener("pointerup", (e) => { if (dragging === e.pointerId) dragging = false })
+  c.cv.addEventListener("lostpointercapture", (e) => { if (dragging === e.pointerId) dragging = false })
+  function tick() {
+    const cap = 40, u = Math.min(rps / cap, 0.97)
+    const base = cache ? 150 : 330
+    const t1 = base + (110 * u) / (1 - u) + gauss(Math.random) * 18
+    cur = { p95: Math.max(80, t1 * 1.55), tps: Math.max(5, 96 * (1 - 0.45 * u) + gauss(Math.random) * 2.5), err: rps > cap ? (rps - cap) / rps : 0 }
+    ttft.push(cur.p95); tps.push(cur.tps)
+    if (ttft.length > 160) { ttft.shift(); tps.shift() }
+  }
+  for (let i = 0; i < 160; i++) tick()
+  function spark(ctx, x, y, w, hh, data, max, title, unit, warnAt) {
+    ctx.strokeStyle = ink(0.08)
+    for (let i = 0; i <= 3; i++) { const yy = Math.round(y + (i * hh) / 3) + 0.5; ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x + w, yy); ctx.stroke() }
+    ctx.font = `500 9px ${FONT}`; ctx.fillStyle = ink(0.4); ctx.textAlign = "left"
+    ctx.fillText(title, x, y - 8)
+    ctx.textAlign = "right"; ctx.fillText(max + " " + unit, x + w, y - 8)
+    if (warnAt) { const wy = y + hh * (1 - warnAt / max); ctx.setLineDash([3, 3]); ctx.strokeStyle = hot(0.6); ctx.beginPath(); ctx.moveTo(x, wy); ctx.lineTo(x + w, wy); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = hot(0.8); ctx.textAlign = "left"; ctx.fillText("SLO " + warnAt + " " + unit, x + 4, wy - 4) }
+    const pt = (i) => [x + (i / (data.length - 1)) * w, y + hh * (1 - clamp(data[i] / max, 0, 1))]
+    ctx.beginPath(); data.forEach((_, i) => { const [a, b] = pt(i); i ? ctx.lineTo(a, b) : ctx.moveTo(a, b) })
+    ctx.strokeStyle = ink(0.9); ctx.lineWidth = 1.25; ctx.stroke(); ctx.lineWidth = 1
+    ctx.lineTo(x + w, y + hh); ctx.lineTo(x, y + hh); ctx.closePath(); ctx.fillStyle = ink(0.06); ctx.fill()
+    const [ex, ey] = pt(data.length - 1)
+    ctx.fillStyle = hot(); ctx.beginPath(); ctx.arc(ex, ey, 3, 0, Math.PI * 2); ctx.fill()
+    ctx.textAlign = "right"; ctx.font = `700 11px ${FONT}`; ctx.fillText(Math.round(data[data.length - 1]) + " " + unit, ex - 6, ey - 8)
+  }
+  return {
+    dispose: c.dispose,
+    frame(t) {
+      if (t - lastTick > 120) { lastTick = t; tick() }
+      const { ctx, w, h: H } = c
+      ctx.clearRect(0, 0, w, H)
+      const pad = 26, topH = Math.round(H * 0.52)
+      const x0 = pad, x1 = w - pad, y0 = 46, y1 = topH - 26
+      hx = { x0, x1, top: y0 - 20, bottom: y1 + 20 }
+      const bins = 20, bw = (x1 - x0) / bins
+      const hist = (arr) => { const b = Array(bins).fill(0); arr.forEach((v) => b[Math.min(bins - 1, Math.floor(v / 5))]++); return b }
+      const h3 = hist(v3), h4 = hist(v4), mx = Math.max(...h3, ...h4)
+      const yb = (n) => y1 - (n / mx) * (y1 - y0)
+      ctx.font = `500 9px ${FONT}`; ctx.fillStyle = ink(0.4); ctx.textAlign = "left"
+      ctx.fillText("EVAL SCORES · 200 CASES · FILLED = PROMPT V4 CANDIDATE · OUTLINE = V3 IN PROD", x0, 22)
+      h4.forEach((n, i) => { ctx.fillStyle = (i + 1) * 5 > thr ? ink(0.8) : ink(0.3); ctx.fillRect(x0 + i * bw + 1, yb(n), bw - 2, y1 - yb(n)) })
+      ctx.strokeStyle = ink(0.55); ctx.beginPath()
+      h3.forEach((n, i) => { const xa = x0 + i * bw, xb = xa + bw; i ? ctx.lineTo(xa, yb(n)) : ctx.moveTo(xa, yb(n)); ctx.lineTo(xb, yb(n)) }); ctx.stroke()
+      ctx.strokeStyle = ink(0.25); ctx.beginPath(); ctx.moveTo(x0, y1 + 0.5); ctx.lineTo(x1, y1 + 0.5); ctx.stroke()
+      ctx.fillStyle = ink(0.4); ctx.textAlign = "center"
+      for (let s = 0; s <= 100; s += 20) ctx.fillText(String(s), x0 + (s / 100) * (x1 - x0), y1 + 14)
+      const cx = x0 + 6.5 * bw
+      ctx.strokeStyle = ink(0.5); ctx.beginPath(); ctx.moveTo(cx, yb(Math.max(h4[5], h4[6])) - 4); ctx.lineTo(cx, y0 + 14); ctx.stroke()
+      ctx.fillStyle = ink(0.75); ctx.textAlign = "left"; ctx.fillText("Simulated: a cluster of 16 low v4 scores. The average hides them.", cx + 6, y0 + 16)
+      const tx = x0 + (thr / 100) * (x1 - x0)
+      ctx.strokeStyle = hot(); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx, y0 - 10); ctx.lineTo(tx, y1); ctx.stroke(); ctx.lineWidth = 1
+      ctx.fillStyle = hot(); ctx.fillRect(tx - 5, y0 - 16, 10, 7)
+      const p3 = pass(v3), p4 = pass(v4), ok = p4 >= 0.85 && p4 >= p3
+      ctx.textAlign = "left"; ctx.font = `600 10px ${FONT}`
+      const lx = tx + 10 > x1 - 150 ? tx - 150 : tx + 10
+      ctx.fillText(`≥ ${thr}  v4 ${Math.round(p4 * 100)}%  v3 ${Math.round(p3 * 100)}%`, lx, y0 - 8)
+      const gate = ok ? "GATE PASS · SHIP V4" : "GATE BLOCK · KEEP V3"
+      ctx.font = `700 11px ${FONT}`
+      const gw = ctx.measureText(gate).width + 16
+      ctx.fillStyle = ok ? ink(1) : hot(); ctx.fillRect(x1 - gw, 10, gw, 18)
+      ctx.fillStyle = "#060606"; ctx.textAlign = "left"; ctx.fillText(gate, x1 - gw + 8, 23)
+      const sy = topH + 30, sh = H - sy - 22, half = (x1 - x0 - 30) / 2
+      spark(ctx, x0, sy, half, sh, ttft, 2500, "P95 TIME TO FIRST TOKEN", "ms", 1200)
+      spark(ctx, x0 + half + 30, sy, half, sh, tps, 120, "TOKENS PER SECOND PER STREAM", "tok/s")
+    },
+    telemetry() {
+      const cost = ((2000 * 3 * (cache ? 0.55 : 1) + 400 * 15) / 1e6) * 1000
+      return [["v4 pass", Math.round(pass(v4) * 100) + "%"], ["v3 pass", Math.round(pass(v3) * 100) + "%"], ["p95 ttft", Math.round(cur.p95) + " ms", cur.p95 > 1200], ["tok/s", Math.round(cur.tps)], ["errors", Math.round(cur.err * 100) + "%", cur.err > 0], ["per 1k requests", "$" + cost.toFixed(2)]]
+    },
+  }
+}
+
+const MODULES = [
+  { id: "inside", n: "00", name: "inside a model", group: 1, status: "done", step: "Step 0", data: "measured · Qwen2.5 0.5B on mps · 16 and 21 Nov 2026",
+    kicker: "First look", title: "A model outputs odds, not words",
+    body: "A forward pass turns five token IDs into a block of logits: one score for each of the 151,936 vocabulary slots, at every position. Softmax turns the last row into probabilities, and something else has to pick one. This is the base model, so it has read a lot of quizzes and worksheets.",
+    try: "Press run forward pass and watch it climb the 24 layers (slowed 6 times). Hover a probability bar to find its spike among the 151,936 slots.",
+    facts: [["31.6%", "Paris wins, but most of the rest is fill in the blank underscores"], ["212 ms", "one forward pass with the GPU timer synced (first run read 774 ms)"], ["151,936", "logit slots; the tokenizer uses 151,665, the rest is padding"], ["' Paris'", "the space is part of the token, so \"Paris\" and \" Paris\" differ"]],
+    lessons: [["Tokens to IDs to logits", 10], ["Softmax and probabilities", 8], ["Timing a GPU honestly", 10], ["Base versus instruct (Step 7)", 12]],
+    run: "uv run python scripts/smoke_test.py", prereq: {}, make: makeInside },
+  { id: "models", n: "01", name: "local models", group: 1, status: "done", step: "Steps 1 and 5", data: "measured · four models in Ollama on an M2 Pro · 17 Nov 2026",
+    kicker: "Serving locally", title: "Decode is a memory problem",
+    body: "Every new token reads all of the model's weights, so decode speed is memory bandwidth divided by model size. Prefill reads the weights once for the whole prompt, so it is limited by arithmetic instead. Time to answer is load plus prompt over prefill speed plus reply over decode speed.",
+    try: "Race the four models. Turn on Part B reply lengths to see Qwen3's 1,145 thinking tokens. Then open kv cache and slide the context.",
+    facts: [["65–80%", "of the chip's 200 GB/s reached by all four models while decoding"], ["10–12×", "prefill over decode on this laptop GPU (predicted 50×)"], ["4.5 GiB", "Qwen3's KV cache at 32k, more than its 2.5 GB of weights"], ["0.8 GiB", "Gemma's cache: sliding window on 29 of 34 layers"], ["1,000×", "warm load (1 to 2 ms) against cold (2.4 to 3.5 s)"]],
+    lessons: [["Bandwidth bound decode", 12], ["Compute bound prefill", 12], ["KV cache sizing", 15], ["Cold, warm and prompt cache", 10], ["Side by side with streaming (Step 5)", 15]],
+    run: "uv run python scripts/bench_ollama.py", prereq: { 0: 1 }, make: makeModels },
+  { id: "tokens", n: "02", name: "tokenizers", group: 1, status: "now", step: "Step 2", data: "measured · six tokenizers, six texts · 18 to 21 Nov 2026",
+    kicker: "Tokenization", title: "The same meaning has different prices",
+    body: "A tokenizer cuts text into pieces from a fixed vocabulary learned from its training text. A word gets its own token only if it was common there. Tokens are what you pay for and what fills the context window, so the vocabulary decides the bill for every language, file format and number.",
+    try: "Pick the Portuguese text, then switch the measure to per char. Open numbers to see three rules for the same seven digits.",
+    facts: [["1.24×", "Portuguese penalty for GPT-4o and Phi-4 mini, against 1.86× for GPT-2"], ["~0.2", "tokens per character for English in all six tokenizers"], ["31 vs 49", "tokens for the numbers text: GPT-2 against the digit splitters"], ["+24", "tokens of hidden chat template on every Llama request"], ["identical", "Phi-4 mini and GPT-4o counts on all six texts: same o200k vocabulary"]],
+    lessons: [["Byte pair encoding", 15], ["Six tokenizers, one sentence", 10], ["Numbers and emoji", 10], ["Chat template overhead", 10], ["Tokens per character chart", 10], ["Streamlit explorer page", 20]],
+    run: "uv run python scripts/token_costs.py", prereq: { 0: 0.6, 1: 0.4 }, make: makeTokenizers },
+  { id: "decoding", n: "03", name: "decoding", group: 1, status: "next", step: "Step 3", data: "real probabilities from Step 0 · the sampling is simulated here",
+    kicker: "Decoding", title: "You choose how to pick",
+    body: "Decoding turns the probability list into one token, then repeats. Greedy always takes the top token. Temperature divides the logits before softmax, sharpening or flattening the odds. Top k keeps the k best, top p keeps the smallest set that covers p of the probability.",
+    try: "Set temperature to 0 and only Paris survives. Push it to 2 and the underscores catch up. Try top p at 0.6.",
+    facts: [["5 of 151,936", "tokens shown; ratios between them are exact at any temperature"], ["0.8 and 0.6", "default temperatures shipped by DeepSeek and Qwen3 (from the Ollama log)"], ["next", "your hand written loop will draw these charts at every step"]],
+    lessons: [["Greedy and its loops", 10], ["Temperature", 10], ["Top k and top p", 12], ["Beam search", 15], ["Per step probability charts", 15]],
+    run: "next: scripts/decode.py (to be written)", prereq: { 0: 0.7, 2: 0.3 }, make: makeDecoding },
+  { id: "context", n: "04", name: "context", group: 1, status: "later", step: "Step 4", data: "simulated · sizes are typical, not measured yet",
+    kicker: "Chat UI", title: "Everything competes for one window",
+    body: "System prompt, template, tool definitions, examples, retrieved documents, chat history and the reply share one context window. Ollama reserved 32k here, and the KV cache for all of it up front. When it fills, something is dropped, usually the oldest turns.",
+    try: "Switch to 8k, then add docs and history until turns start to drop.",
+    facts: [["32,768", "context Ollama reserved for every model in Step 1"], ["2 to 24", "template tokens each model adds before your first word"]],
+    lessons: [["Chat templates and roles", 10], ["Streaming tokens", 12], ["Context budgets", 15], ["Truncation and summaries", 12]],
+    run: "planned: Streamlit chat page with model picker and sliders", prereq: { 2: 0.5, 1: 0.5 }, make: makeContext },
+  { id: "evals", n: "05", name: "evals", group: 1, status: "later", step: "Steps 6 and 8", data: "simulated · replaced by your SQLite results in Step 6",
+    kicker: "Evals", title: "A prompt change is a deploy",
+    body: "Evals are a fixed set of cases, a score and a threshold that blocks bad releases. An average can hide a cluster of failures, so look at the distribution. In production you watch time to first token, throughput and cost per request like any other API.",
+    try: "Drag the orange threshold. Then raise the load and watch p95 latency bend as the queue builds.",
+    facts: [["20–30", "prompts planned for the Step 6 harness, exact match plus LLM judge"]],
+    lessons: [["Building an eval set", 15], ["LLM as judge", 12], ["Regression gates", 12], ["Fine tune with TRL (stretch)", 20]],
+    run: "planned: scripts/eval.py with results in SQLite", prereq: { 3: 0.4, 4: 0.3, 1: 0.3 }, make: makeEvals },
+  { id: "embeddings", n: "06", name: "embeddings", group: 2, status: "later", step: "Project 2", data: "simulated preview",
+    kicker: "Embeddings", title: "Meaning becomes position",
+    body: "An embedding model turns text into a long list of numbers. Texts that mean similar things land close together. Search, clustering and RAG all rest on that one idea: distance stands in for meaning. This map squeezes thousands of dimensions into two.",
+    try: "Move over the map. The probe links to its three nearest words. Turn on the analogy to see direction carry meaning too.",
+    facts: [], lessons: [["Vectors and cosine similarity", 15], ["Choosing an embedding model", 12], ["Dimensions, storage and cost", 14]],
+    run: "Project 2: multimodal RAG chatbot", prereq: { 2: 1 }, make: makeEmbeddings },
+  { id: "attention", n: "07", name: "attention", group: 2, status: "later", step: "Concept", data: "simulated preview",
+    kicker: "Transformers", title: "Every token looks back",
+    body: "Inside each of those 24 layers, every token decides how much to borrow from every earlier token. That weighting is attention. Different heads learn different habits. Nothing can look forward, which is the causal mask, and the keys and values it stores are the KV cache from module 01.",
+    try: "Hover a word. Thicker lines and heavier type mean more attention. Switch heads and watch \"it\" find \"model\".",
+    facts: [], lessons: [["Queries, keys and values", 18], ["Multi head attention", 15], ["The causal mask", 8]],
+    run: "Plot real attention maps from Qwen2.5 0.5B with output_attentions=True", prereq: { 0: 0.6, 1: 0.4 }, make: makeAttention },
+  { id: "retrieval", n: "08", name: "retrieval", group: 2, status: "later", step: "Project 2", data: "simulated preview",
+    kicker: "RAG", title: "Retrieve first, then generate",
+    body: "Retrieval augmented generation finds the chunks of your documents nearest to the question and puts them in the prompt. Quality depends on chunk size, how many chunks you pull and whether a reranker reorders them. If the right chunk is never retrieved, the model cannot use it.",
+    try: "Drag the query. Ringed dots are the chunks that actually answer it. Try rewrite and rerank to pull them in.",
+    facts: [], lessons: [["Chunking strategies", 15], ["Vector search", 18], ["Reranking and recall", 14]],
+    run: "Project 2: multimodal RAG chatbot", prereq: { 6: 0.6, 4: 0.4 }, make: makeRag },
+  { id: "agents", n: "09", name: "agents", group: 2, status: "later", step: "Projects 3 and 4", data: "simulated preview",
+    kicker: "Agents", title: "A loop with tools and a brake",
+    body: "An agent is a model in a loop. It plans, calls a tool, reads the result and decides what to do next. The loop is the easy part. The hard parts are error handling, step limits and knowing which actions need a human to approve them.",
+    try: "Inject a tool error and watch it back off and retry. Turn the approval gate off and see what runs unchecked.",
+    facts: [], lessons: [["Tool calling and schemas", 15], ["The agent loop", 12], ["Guardrails and approvals", 14], ["Deep research orchestration", 15]],
+    run: "Project 3: web agent · Project 4: deep research system", prereq: { 4: 0.4, 8: 0.3, 5: 0.3 }, make: makeAgent },
+]
+const STATUS = { done: ["done", "✓"], now: ["in progress", "●"], next: ["up next", "○"], later: ["later", "·"] }
+
+const EXAMPLE_DONE = { "inside:0": 1, "inside:1": 1, "inside:2": 1, "models:0": 1, "models:1": 1, "models:2": 1, "models:3": 1, "tokens:0": 1, "tokens:1": 1, "tokens:2": 1, "tokens:3": 1, "tokens:4": 1 }
+const KEY = "deck-done-v2"
+let done
+try { done = JSON.parse(localStorage.getItem(KEY) || "null") || { ...EXAMPLE_DONE } } catch { done = { ...EXAMPLE_DONE } }
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(done)) } catch {} }
+const progress = (i) => MODULES[i].lessons.filter((_, k) => done[`${MODULES[i].id}:${k}`]).length / MODULES[i].lessons.length
+
+let active = 0, current = null
+const row = $("#seq-row"), arcs = $("#seq-arcs"), stage = $("#stage"), controls = $("#controls"), lesson = $("#lesson"), tray = $("#tray")
+
+function buildSeq() {
+  row.replaceChildren(...MODULES.map((m, i) => {
+    const b = h("button", { type: "button", class: "mod " + m.status, "aria-current": String(i === active), style: `--p:${progress(i)}`, title: STATUS[m.status][0] }, h("span", { class: "n" }, m.n), h("span", { class: "nm" }, m.name), h("span", { class: "pip" }, STATUS[m.status][1]), h("span", { class: "bar" }))
+    b.onclick = () => go(i)
+    return b
+  }))
+  requestAnimationFrame(drawArcs)
+}
+function drawArcs() {
+  const inner = $("#seq-inner").getBoundingClientRect()
+  arcs.setAttribute("viewBox", `0 0 ${inner.width} ${inner.height}`)
+  arcs.replaceChildren()
+  const pos = [...row.children].map((b) => { const r = b.getBoundingClientRect(); return { x: r.left - inner.left + r.width / 2, y: r.top - inner.top } })
+  const edge = (i, j, wgt, mode) => {
+    const a = pos[i], b = pos[j], dist = Math.abs(a.x - b.x)
+    const apex = a.y - 8 - Math.min(34, dist * 0.08)
+    const d = `M${a.x},${a.y}C${a.x},${apex} ${b.x},${apex} ${b.x},${b.y}`
+    const attrs = { d, fill: "none" }
+    if (mode === "hot") Object.assign(attrs, { stroke: hot(), "stroke-width": (1 + wgt * 4).toFixed(1), "stroke-opacity": 0.4 + 0.6 * wgt })
+    else if (mode === "next") Object.assign(attrs, { stroke: ink(0.45), "stroke-dasharray": "3 3" })
+    else Object.assign(attrs, { stroke: ink(0.1) })
+    svgEl("path", attrs, arcs)
+    if (mode === "hot") {
+      const t = svgEl("text", { x: (a.x + b.x) / 2, y: apex + 6, "text-anchor": "middle", "font-size": 9, fill: hot(), "font-family": FONT }, arcs)
+      t.textContent = wgt.toFixed(1)
+    }
+  }
+  MODULES.forEach((m, i) => Object.entries(m.prereq).forEach(([j, w]) => { if (i !== active && +j !== active) edge(i, +j, w, "faint") }))
+  MODULES.forEach((m, i) => Object.entries(m.prereq).forEach(([j, w]) => { if (+j === active) edge(i, +j, w, "next") }))
+  Object.entries(MODULES[active].prereq).forEach(([j, w]) => edge(active, +j, w, "hot"))
+}
+function renderLesson() {
+  const m = MODULES[active]
+  const list = h("ul", { id: "lessons" }, ...m.lessons.map(([title, min], k) => {
+    const key = `${m.id}:${k}`
+    const b = h("button", { type: "button", "aria-pressed": String(!!done[key]) }, h("span", { class: "box" }), h("span", {}, title), h("span", { class: "min" }, h("i", { style: `width:${min * 2}px` }), min + "m"))
+    b.onclick = () => { done[key] ? delete done[key] : (done[key] = 1); save(); b.setAttribute("aria-pressed", String(!!done[key])); updateProgress() }
+    return h("li", {}, b)
+  }))
+  const total = m.lessons.reduce((a, [, x]) => a + x, 0)
+  const sim = m.data.startsWith("simulated")
+  lesson.replaceChildren(
+    h("div", { class: "num" }, m.n),
+    h("div", { class: "kicker" }, `${m.kicker} · ${m.step} · ${m.group === 1 ? "project 1" : "ahead"}`),
+    h("h1", {}, m.title),
+    h("div", { class: "status" }, h("span", { class: "pill " + m.status }, STATUS[m.status][0]), h("span", { class: "pill " + (sim ? "sim" : "real") }, sim ? "simulated" : "real data")),
+    h("p", {}, m.body),
+    h("p", { class: "try" }, m.try),
+    m.facts.length ? h("h2", {}, h("span", {}, "What you measured"), h("span", {}, "")) : null,
+    m.facts.length ? h("ul", { class: "facts" }, ...m.facts.map(([k, v]) => h("li", {}, h("b", {}, k), h("span", {}, v)))) : null,
+    h("h2", {}, h("span", {}, "Lessons"), h("span", {}, total + " min")),
+    list,
+    h("h2", {}, h("span", {}, m.group === 1 ? "In the repo" : "Where it comes in")),
+    h("div", { class: "lab" }, h("b", {}, m.data), h("code", { class: "run" }, m.run)),
+  )
+}
+function updateProgress() {
+  const all = MODULES.reduce((a, m) => a + m.lessons.length, 0)
+  const n = Object.keys(done).filter((k) => MODULES.some((m) => k.startsWith(m.id + ":"))).length
+  $("#progress-readout").innerHTML = `progress <b>${n} / ${all}</b> lessons · project 1 <b>2 of 8</b> build steps done`
+  ;[...row.children].forEach((b, i) => b.style.setProperty("--p", progress(i)))
+}
+function go(i, fromHash) {
+  active = (i + MODULES.length) % MODULES.length
+  current?.dispose?.()
+  stage.replaceChildren()
+  controls.replaceChildren()
+  current = MODULES[active].make(stage, controls)
+  if (MODULES[active].data.startsWith("simulated") && !stage.querySelector(".tag")) stage.firstChild?.prepend?.(h("span", { class: "tag" }, "simulated preview"))
+  ;[...row.children].forEach((b, k) => b.setAttribute("aria-current", String(k === active)))
+  drawArcs()
+  renderLesson()
+  updateProgress()
+  lesson.scrollTop = 0
+  if (!fromHash && location.hash !== "#" + MODULES[active].id) history.replaceState(null, "", "#" + MODULES[active].id)
+  renderTray()
+}
+function renderTray() {
+  const items = current?.telemetry?.() || []
+  tray.innerHTML = `<span><b>${MODULES[active].n}</b> ${MODULES[active].name}</span>` + items.map(([k, v, isHot]) => `<span class="${isHot ? "hot" : ""}">${k} <b>${v}</b></span>`).join("") + `<span class="hint">← → switch modules</span>`
+}
+function loop(t) {
+  requestAnimationFrame(loop)
+  try { current?.frame?.(t) } catch (err) { console.error(err) }
+}
+document.addEventListener("keydown", (e) => {
+  if (e.target.closest("textarea, input, [role=slider]")) return
+  if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return
+  go(active + (e.key === "ArrowRight" ? 1 : -1))
+  // The focused control may have been removed with the old station, so keep focus on the new one.
+  row.children[active]?.focus()
+})
+window.addEventListener("resize", drawArcs)
+window.addEventListener("hashchange", () => { const i = MODULES.findIndex((m) => "#" + m.id === location.hash); if (i >= 0 && i !== active) go(i, true) })
+setInterval(renderTray, 250)
+buildSeq()
+const start = MODULES.findIndex((m) => "#" + m.id === location.hash)
+go(start >= 0 ? start : 2, true)
+requestAnimationFrame(loop)
+document.fonts?.ready.then(drawArcs)
+</script>
