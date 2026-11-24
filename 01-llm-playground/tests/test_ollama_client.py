@@ -41,3 +41,13 @@ def test_same_model_treats_missing_tag_as_latest():
     assert same_model("qwen3:4b", "qwen3:4b")
     assert not same_model("llama3.2", "llama3.2:3b")
     assert same_model("library/llama3.2", "library/llama3.2:latest")
+
+
+def test_same_model_drops_default_host_and_namespace():
+    assert same_model("library/llama3.2", "llama3.2:latest")
+    assert same_model("registry.ollama.ai/library/llama3.2:3b", "llama3.2:3b")
+    assert not same_model("library/llama3.2:3b", "llama3.2")
+    assert not same_model("someone/llama3.2", "llama3.2")
+    # A registry port is part of the host, not a tag.
+    assert same_model("localhost:5000/team/model", "localhost:5000/team/model:latest")
+    assert not same_model("localhost:5000/team/model", "localhost/team/model:5000")

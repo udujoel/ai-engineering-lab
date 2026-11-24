@@ -25,13 +25,26 @@ def get_client() -> Client:
 
 
 def same_model(a: str, b: str) -> bool:
-    """True when two Ollama names mean the same model. A missing tag means `latest`, so
-    `llama3.2` and `llama3.2:latest` match, while `llama3.2:3b` stays different."""
+    """True when two Ollama names mean the same model.
 
-    def full(name: str) -> str:
-        return name if ":" in name.rsplit("/", 1)[-1] else f"{name}:latest"
+    A full name is `host/namespace/model:tag`. Ollama fills in `registry.ollama.ai`,
+    `library` and `latest` when they are left out, and `ollama ps` prints the short form.
+    So `llama3.2`, `library/llama3.2` and `llama3.2:latest` all match, while `llama3.2:3b`
+    stays different.
+    """
 
-    return full(a) == full(b)
+    def short(name: str) -> str:
+        path, _, tag = name.rpartition(":")
+        if not path or "/" in tag:  # no tag, or the colon was a registry port
+            path, tag = name, "latest"
+        parts = path.split("/")
+        if len(parts) == 3 and parts[0] == "registry.ollama.ai":
+            parts = parts[1:]
+        if len(parts) == 2 and parts[0] == "library":
+            parts = parts[1:]
+        return "/".join(parts) + ":" + tag
+
+    return short(a) == short(b)
 
 
 def unload(client: Client, model: str, timeout_s: float = 15.0) -> None:
