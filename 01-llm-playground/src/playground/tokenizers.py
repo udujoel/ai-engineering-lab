@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from functools import cache
 
 import tiktoken
+from dotenv import load_dotenv
 from transformers import AutoTokenizer
 
 # Hugging Face repos. Only the tokenizer files are downloaded (a few MB each), never the weights.
@@ -51,6 +52,11 @@ def tokenize(name: str, text: str) -> Tokens:
     if name in TIKTOKEN_ENCODINGS:
         return _tokenize_tiktoken(name, text)
     raise KeyError(f"Unknown tokenizer {name!r}. Choose from: {', '.join(ALL)}")
+
+
+# HF_TOKEN in .env, needed only for gated tokenizers. Loaded once, when this module is imported;
+# values already exported in the shell win.
+load_dotenv()
 
 
 # @cache keeps each tokenizer in memory after the first load, so the Streamlit page in part C
@@ -95,6 +101,6 @@ def _tokenize_tiktoken(name: str, text: str) -> Tokens:
     ids = enc.encode(text, disallowed_special=())
     # tiktoken gives only where each token starts. Each token ends where the next one starts.
     _, starts = enc.decode_with_offsets(ids)
-    ends = [*starts[1:], len(text)]
+    ends = [*starts[1:], len(text)] if starts else []  # empty text: no tokens, no ends
     pieces = [text[start:end] for start, end in zip(starts, ends, strict=True)]
     return Tokens(name, enc.n_vocab, ids, pieces)

@@ -24,6 +24,16 @@ def get_client() -> Client:
     return Client(host=os.getenv("OLLAMA_HOST") or DEFAULT_HOST)
 
 
+def same_model(a: str, b: str) -> bool:
+    """True when two Ollama names mean the same model. A missing tag means `latest`, so
+    `llama3.2` and `llama3.2:latest` match, while `llama3.2:3b` stays different."""
+
+    def full(name: str) -> str:
+        return name if ":" in name.rsplit("/", 1)[-1] else f"{name}:latest"
+
+    return full(a) == full(b)
+
+
 def unload(client: Client, model: str, timeout_s: float = 15.0) -> None:
     """Ask Ollama to drop the model from memory, then wait until `ollama ps` agrees.
 
@@ -32,7 +42,7 @@ def unload(client: Client, model: str, timeout_s: float = 15.0) -> None:
     client.generate(model=model, keep_alive=0)  # empty prompt + keep_alive 0 = unload
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
-        if all(m.model != model for m in client.ps().models):
+        if not any(same_model(m.model, model) for m in client.ps().models):
             return
         time.sleep(0.2)
     raise RuntimeError(f"{model} was still loaded after {timeout_s:.0f}s")

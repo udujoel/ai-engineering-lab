@@ -16,7 +16,7 @@ Machine: MacBook Pro, Apple M2 Pro, 32 GB unified memory (about 200 GB/s memory 
 | Load time, first run (includes download) | 31.3 s |
 | Prompt tokens | `['The', ' capital', ' of', ' France', ' is']` |
 | Token IDs | `[785, 6722, 315, 9625, 374]` |
-| One forward pass | 774 ms |
+| One forward pass | 774 ms (first run, timer not synced with the GPU; see the rerun below) |
 | Output shape (logits) | (1, 5, 151936): one score per vocabulary entry, at every position |
 
 Top 5 guesses for the next token:
@@ -30,9 +30,11 @@ Top 5 guesses for the next token:
 | `:\n` | 5.1% |
 
 **Observations**
-- A model never outputs a word. It outputs a probability for every one of 151,936 tokens, and something else picks one.
+- A model never outputs a word. It outputs a score (a logit) for each of its 151,936 vocabulary slots, softmax turns the scores into probabilities, and something else picks one. (The tokenizer uses 151,665 of those slots; the rest are padding that never wins.)
 - Paris wins with only 31.6%. Most of the rest is fill in the blank underscores: a base model has read a lot of quizzes and worksheets, so "The capital of France is ____" is a very common pattern in its training text.
 - Words start with a space inside the token (`' Paris'`), so " Paris" and "Paris" are different tokens.
+
+**Rerun with a synced timer (2026-11-21).** After mistake 12 the smoke test waits for the GPU (`torch.mps.synchronize()`) before stopping the clock. The rerun gave **212 ms** for the forward pass, with the same tokens, IDs and top 5. Load took 4.9 s because the weights were already on disk. A synced timer can only add time, so the drop from 774 ms is not the sync. The likely cause is first run overhead: the first time a model runs on `mps`, the GPU kernels get compiled and memory gets set up. One run each, so treat both numbers as rough.
 
 ---
 
@@ -72,11 +74,11 @@ Prompt: "Explain what a token is in two sentences." Run with `ollama run <model>
 
 All four land at 65 to 80% of the chip's 200 GB/s. Gemma downloads at 3.4 GB but decodes like a 2.5 GB model, because the vision part is not touched when writing text.
 
-**Finding 2: thinking tokens decide the total time.** Qwen3 and Gemma decode at the same speed, but Qwen3 wrote 1,145 tokens against Gemma's 56 and took 7 times as long. Deepseek is slower per token but wrote half as many tokens as Qwen3, so it finished first of the two. Time to answer = load + reply tokens / decode speed.
+**Finding 2: thinking tokens decide the total time.** Qwen3 and Gemma decode at the same speed, but Qwen3 wrote 1,145 tokens against Gemma's 56 and took 7 times as long. Deepseek is slower per token but wrote half as many tokens as Qwen3, so it finished first of the two. Time to answer = load + prompt tokens / prefill speed + reply tokens / decode speed. With prompts this short, the reply term dominates.
 
 **Finding 3: `--think=false` did not stop Qwen3 from thinking.** The server log names the model "Qwen3 4B Thinking 2507", a model trained to always reason. Ollama switched thinking off in the template, the model reasoned anyway, and the reasoning leaked into the visible answer (a lone `</think>` near the end). It saved only 217 tokens. A flag can ask for a behaviour; the weights decide.
 
-**Finding 4: most of the memory is the KV cache, not the model.** `ollama ps` showed 6.0 GB for a 2.0 GB model. Ollama reserves a KV cache for the full 32,768 token context up front. Figures from the server log:
+**Finding 4: at a 32k context, the KV cache can take more memory than the model.** `ollama ps` showed 6.0 GB for a 2.0 GB model. Ollama reserves a KV cache for the full 32,768 token context up front. Figures from the server log:
 
 | Model | Download | KV cache | In memory |
 |---|---|---|---|
@@ -84,7 +86,7 @@ All four land at 65 to 80% of the chip's 200 GB/s. Gemma downloads at 3.4 GB but
 | qwen3:4b | 2.5 GB | 4.5 GiB | about 7.0 GB |
 | deepseek-r1:7b | 4.7 GB | 1.75 GiB | 6.0 GB |
 
-KV cache = 2 (keys and values) x layers x KV heads x 128 x 2 bytes x 32,768 positions. Qwen3 has 36 layers x 8 KV heads, deepseek 28 x 4, so the smaller model carries 2.6 times the cache.
+KV cache = 2 (keys and values) x layers x KV heads x head dimension x 2 bytes x 32,768 positions. The head dimension is 128 for Llama, Qwen3 and DeepSeek, and 256 for Gemma. Qwen3 has 36 layers x 8 KV heads, deepseek 28 x 4, so the smaller model carries 2.6 times the cache.
 
 **Finding 5: only one model fits at a time on this Mac right now.** After all four runs, `ollama ps` listed only deepseek. The server log said: `model predicted to exceed available memory, evicting ... system_free="4.4 GiB"`. The limit was free system RAM, not the GPU budget, because the Mac shares one pool of memory between apps and GPU.
 
@@ -293,7 +295,7 @@ What the chat template adds, per model:
 
 **Gemma matches none of the six**, as expected: its vocabulary is one we haven't loaded. It also splits numbers digit by digit (33 tokens for 28 digits).
 
-**The template cost is fixed per model.** Llama wraps every prompt in 24 extra tokens, DeepSeek in 2. For a short question Llama's wrapping is more than twice the question itself. Gemma's 9, 8, 9 is the only one that varies with the text; reason not known yet.
+**The template cost looks fixed per model, at least for these three texts.** Llama wraps every prompt in 24 extra tokens, DeepSeek in 2. For a short question Llama's wrapping is more than twice the question itself. Gemma's 9, 8, 9 is the only one that varies with the text; reason not known yet.
 
 My interpretation:
 1. Llama = GPT-4 + 1: "suggests it comes from the same GPT-4's with an extra token always added". The extra token is a start of text marker the runtime puts in front of every input; DeepSeek adds one too, Qwen3 doesn't. Llama's vocabulary is larger than GPT-4's: `ollama show llama3.2:3b --verbose` gives `llama.vocab_size 128256`, against GPT-4's 100,277. So it looks like GPT-4's plus about 28k extra entries. Yet on this Portuguese sentence the extras saved nothing: 14 + 1, the same as GPT-4.
@@ -328,3 +330,45 @@ First answer to the "done when" question: GPT-4o and Phi-4 mini are cheapest for
 Rerun after the prediction: same output.
 
 **Qwen2.5 and GPT-4 split the Portuguese the same way, but most IDs differ** (`·no` 902 vs 912, `·ch` 521 vs 523, `ato` 4330 vs 4428). Only the shortest pieces match. The Qwen report explains the shared splits: it started from GPT-4's cl100k vocabulary. Why the IDs shifted is a guess: Qwen splits numbers into single digits, so it would have removed cl100k's multi digit tokens (`00`, `201` and so on), moving every later ID down. Qwen's IDs here are all a little lower, which fits. Not checked.
+
+### Part B (finish): six kinds of text, tokens per character (2026-11-21)
+
+`scripts/token_costs.py` counts tokens for six fixed texts (`src/playground/sample_texts.py`) with all six Part A tokenizers and divides by the number of characters, so short and long texts compare fairly. The English and Portuguese paragraphs say the same thing, so their difference is the language alone. It writes `results/step2_token_costs.json` (for the Streamlit page and the portfolio site) and `results/step2_tokens_per_char.html` (grouped bar chart).
+
+Run on the Mac (`uv run python scripts/token_costs.py`), all tests passing (13 fast, 18 tokenizer and cost tests).
+
+Tokens:
+
+| Tokenizer | English (270 chars) | Portuguese (275) | Python (240) | JSON (157) | Numbers (77) | Emoji (33) |
+|---|---|---|---|---|---|---|
+| gpt2 | 56 | 104 | 86 | 67 | 31 | 20 |
+| qwen2.5 | 56 | 85 | 72 | 73 | 49 | 15 |
+| smollm2 | 58 | 104 | 79 | 77 | 49 | 22 |
+| phi-4-mini | 55 | 68 | 66 | 65 | 35 | 14 |
+| gpt-4 | 56 | 88 | 66 | 65 | 35 | 19 |
+| gpt-4o | 55 | 68 | 66 | 65 | 35 | 14 |
+
+Tokens per character (lower is cheaper):
+
+| Tokenizer | English | Portuguese | Python | JSON | Numbers | Emoji |
+|---|---|---|---|---|---|---|
+| gpt2 | 0.207 | 0.378 | 0.358 | 0.427 | 0.403 | 0.606 |
+| qwen2.5 | 0.207 | 0.309 | 0.300 | 0.465 | 0.636 | 0.454 |
+| smollm2 | 0.215 | 0.378 | 0.329 | 0.490 | 0.636 | 0.667 |
+| phi-4-mini | 0.204 | 0.247 | 0.275 | 0.414 | 0.454 | 0.424 |
+| gpt-4 | 0.207 | 0.320 | 0.275 | 0.414 | 0.454 | 0.576 |
+| gpt-4o | 0.204 | 0.247 | 0.275 | 0.414 | 0.454 | 0.424 |
+
+Portuguese penalty (Portuguese tokens divided by English tokens, 1.0 means none): phi-4-mini 1.24, gpt-4o 1.24, qwen2.5 1.52, gpt-4 1.57, smollm2 1.79, gpt2 1.86.
+
+**Observations**
+- **English costs the same everywhere**: 55 to 58 tokens, about 0.2 tokens per character (5 characters per token). Every tokenizer was trained mostly on English, so English is the baseline, not a test.
+- **The paragraph confirms the one sentence result.** GPT-4o and Phi-4 mini pay 24% more for Portuguese; GPT-2 pays 86% more for the same meaning. Same ranking as the cat sentence, now on 275 characters.
+- **Phi-4 mini and GPT-4o give identical counts on all six texts.** Together with identical IDs on the emoji in Part A, that points to Phi-4 mini using GPT-4o's o200k vocabulary.
+- **Code**: GPT-4, GPT-4o and Phi-4 mini 66, Qwen2.5 72, GPT-2 86. GPT-2 has no tokens for runs of spaces, so every indent costs several tokens.
+- **Numbers flip the ranking.** GPT-2 is cheapest (31) and Qwen2.5 and SmolLM2 most expensive (49), because those two split every digit. Part A showed why that can be worth it for arithmetic.
+- **JSON is expensive for everyone** (0.41 to 0.49): quotes, colons, braces and keys like `prompt_eval_count` break into many short pieces.
+- **Emoji are the worst per character**: SmolLM2 22 tokens for 33 characters. The flag 🇵🇹 and ❤️ are several code points each.
+
+**For Du to interpret:** (1) If you were serving a Portuguese chatbot, how much would the tokenizer choice change your bill and your usable context, using these numbers? (2) Qwen2.5 is cheap on Portuguese and code but expensive on numbers; is that a good trade for a model you'd use for maths homework?
+
