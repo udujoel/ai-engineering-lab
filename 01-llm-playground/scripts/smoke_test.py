@@ -23,6 +23,8 @@ def sync(device: torch.device) -> None:
     """Wait until the GPU has finished all queued work. The CPU runs in order, so it needs none."""
     if device.type == "mps":
         torch.mps.synchronize()
+    elif device.type == "cuda":  # not picked today, but keeps the timer honest if it ever is
+        torch.cuda.synchronize()
 
 
 def main(prompt: str) -> None:

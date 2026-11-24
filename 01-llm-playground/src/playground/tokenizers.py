@@ -54,11 +54,15 @@ def tokenize(name: str, text: str) -> Tokens:
     raise KeyError(f"Unknown tokenizer {name!r}. Choose from: {', '.join(ALL)}")
 
 
+# HF_TOKEN in .env, needed only for gated tokenizers. Loaded once, when this module is imported;
+# values already exported in the shell win.
+load_dotenv()
+
+
 # @cache keeps each tokenizer in memory after the first load, so the Streamlit page in part C
 # doesn't reload it on every keystroke.
 @cache
 def _hf(name: str):
-    load_dotenv()  # HF_TOKEN in .env, needed only for gated tokenizers; shell values win
     return AutoTokenizer.from_pretrained(HF_TOKENIZERS[name])
 
 

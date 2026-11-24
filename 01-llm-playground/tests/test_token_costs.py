@@ -31,6 +31,7 @@ def test_tokens_per_char():
 
 def test_language_penalty_is_portuguese_over_english():
     penalty = language_penalty(measure(["words", "chars"], TEXTS, fake_count))
+    # "words": 6 words / 4 words. "chars": 11 characters / 7 characters, spaces included.
     assert penalty == {"words": 1.5, "chars": pytest.approx(11 / 7, abs=1e-3)}
 
 
