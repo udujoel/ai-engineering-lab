@@ -1,0 +1,41 @@
+[project]
+name = "playground"
+version = "0.1.0"
+description = "See what happens between a prompt and a reply: tokenization, decoding, sampling and model comparison."
+readme = "README.md"
+authors = [
+    { name = "Joel Udu", email = "hello@joeludu.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "altair>=6.3.0",
+    "ollama>=0.6.3",
+    "pandas>=3.1.1",
+    "python-dotenv>=1.2.4",
+    "streamlit>=1.67.0",
+    "tiktoken>=0.14.0",
+    "torch>=2.15.0",
+    "transformers>=5,<6",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.8,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "ruff>=0.17.5",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# E/F: real errors, I: sorted imports, B: common bug patterns, UP: modern syntax
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: downloads or runs a real model (deselect with -m 'not slow')"]
